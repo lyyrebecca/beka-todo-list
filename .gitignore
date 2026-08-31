@@ -1,0 +1,20 @@
+# Build products and local runtime data
+LiquidTodo.app/
+.build/
+DerivedData/
+Backups/
+Evidence/
+release/
+xiaohongshu-promo-v1/
+*.dSYM/
+
+# macOS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Local tooling and secrets
+.env
+.env.*
+*.xcuserstate
+xcuserdata/
