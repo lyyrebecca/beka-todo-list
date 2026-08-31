@@ -22,7 +22,7 @@
 
 <p align="center">
   <img src="public-assets/screenshots/time-and-priority.png" width="360" alt="时间模式和重要级别的真实创建界面截图">
-  <img src="public-assets/screenshots/mini-orb.jpg" width="180" alt="收起后的紫色干悬浮球真实截图">
+  <img src="public-assets/screenshots/mini-orb.png" width="180" alt="收起后的紫色干悬浮球真实截图">
 </p>
 
 ## 下载与安装
