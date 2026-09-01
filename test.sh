@@ -17,8 +17,9 @@ grep -q 'func minimizeWidget()' Sources/AppDelegate.swift
 grep -q 'func restoreWidget()' Sources/AppDelegate.swift
 grep -q 'Text("干")' Sources/WidgetView.swift
 grep -q 'static let miniSize: CGFloat = 48' Sources/AppDelegate.swift
-grep -q 'context.duration = 0.34' Sources/AppDelegate.swift
+grep -q 'context.duration = windowMotionDuration' Sources/AppDelegate.swift
 grep -q 'window.hasShadow = false' Sources/AppDelegate.swift
+! grep -q 'window.hasShadow = true' Sources/AppDelegate.swift
 grep -q 'snapMiniFrameToNearestEdge' Sources/AppDelegate.swift
 grep -q 'override var canBecomeMain: Bool { true }' Sources/WidgetWindow.swift
 grep -q 'makeKeyAndOrderFront' Sources/WidgetWindow.swift

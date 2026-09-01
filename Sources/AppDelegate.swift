@@ -57,8 +57,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                               defer: false)
         window.isOpaque = false
         window.backgroundColor = .clear
-        // 迷你圆圈使用自身的圆形阴影；NSWindow 的矩形阴影会在白底形成灰色方边。
-        window.hasShadow = !store.isMinimized
+        // SwiftUI 自己绘制圆角层次；禁用 NSWindow 的矩形阴影，避免白底上出现方形灰/黑边。
+        window.hasShadow = false
         window.level = currentLevel
         window.ignoresMouseEvents = desktopMode
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -297,7 +297,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         store.isAdding = false
         store.editingTextId = nil
         withAnimation(componentMotion) { store.isMinimized = true }
-        window.hasShadow = false
         UserDefaults.standard.set(true, forKey: "widgetMinimized")
         lastSize = .zero
         animateWindow(to: miniTargetFrame())
@@ -307,7 +306,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard store.isMinimized else { return }
         saveFrameImmediately()
         withAnimation(componentMotion) { store.isMinimized = false }
-        window.hasShadow = true
         UserDefaults.standard.set(false, forKey: "widgetMinimized")
         lastSize = .zero
         window.orderFrontRegardless()
