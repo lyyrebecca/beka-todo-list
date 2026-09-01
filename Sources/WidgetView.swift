@@ -26,8 +26,10 @@ struct WidgetView: View {
             }
         )
         .onPreferenceChange(ContentSizeKey.self) { onSizeChange($0) }
-        .transition(.opacity.combined(with: .scale(scale: 0.88)))
-        .animation(.smooth(duration: 0.30), value: store.isMinimized)
+        .transition(.opacity.combined(with: .scale(scale: 0.94)))
+        // 临界阻尼，避免缩小/恢复时出现“果冻式”二次回弹。
+        .animation(.spring(response: 0.36, dampingFraction: 0.88, blendDuration: 0.08),
+                   value: store.isMinimized)
     }
 
     private var normalWidget: some View {
@@ -47,7 +49,7 @@ struct WidgetView: View {
             }
             if store.isAdding && !store.isShowingArchive {
                 AddRowView(store: store, dark: dark)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             }
         }
         .padding(15)
@@ -67,9 +69,9 @@ struct WidgetView: View {
                 .allowsHitTesting(false)
         )
         .padding(6)
-        .animation(.easeInOut(duration: 0.35), value: store.items)
-        .animation(.easeInOut(duration: 0.25), value: store.isAdding)
-        .animation(.easeInOut(duration: 0.25), value: store.isExpanded)
+        .animation(.spring(response: 0.38, dampingFraction: 0.88, blendDuration: 0.08), value: store.items)
+        .animation(.spring(response: 0.30, dampingFraction: 0.90, blendDuration: 0.05), value: store.isAdding)
+        .animation(.spring(response: 0.30, dampingFraction: 0.90, blendDuration: 0.05), value: store.isExpanded)
     }
 
     private var miniWidget: some View {
@@ -77,30 +79,32 @@ struct WidgetView: View {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [Color(red: 0.76, green: 0.70, blue: 1.00).opacity(0.92),
-                                 Color(red: 123 / 255, green: 104 / 255, blue: 238 / 255).opacity(0.90),
-                                 Color(red: 0.34, green: 0.27, blue: 0.76).opacity(0.92)],
-                        center: UnitPoint(x: 0.32, y: 0.22),
-                        startRadius: 1,
-                        endRadius: 34
+                        colors: [Color.white.opacity(0.52),
+                                 Color(red: 0.76, green: 0.70, blue: 1.00).opacity(0.48),
+                                 Color(red: 123 / 255, green: 104 / 255, blue: 238 / 255).opacity(0.58),
+                                 Color(red: 0.34, green: 0.27, blue: 0.76).opacity(0.64)],
+                        center: UnitPoint(x: 0.30, y: 0.18),
+                        startRadius: 0,
+                        endRadius: 36
                     )
                 )
             Ellipse()
                 .fill(
-                    LinearGradient(colors: [Color.white.opacity(0.43), Color.white.opacity(0.03)],
+                    LinearGradient(colors: [Color.white.opacity(0.62), Color.white.opacity(0.04)],
                                    startPoint: .top, endPoint: .bottom)
                 )
-                .frame(width: 24, height: 10)
-                .blur(radius: 1.2)
+                .frame(width: 26, height: 11)
+                .blur(radius: 1.6)
                 .offset(x: -3, y: -10)
+                .blendMode(.screen)
                 .allowsHitTesting(false)
             Circle()
                 .strokeBorder(
-                    LinearGradient(colors: [Color.white.opacity(0.75),
-                                             Color.white.opacity(0.20),
-                                             Color.purple.opacity(0.36)],
+                    LinearGradient(colors: [Color.white.opacity(0.88),
+                                             Color.white.opacity(0.30),
+                                             Color(red: 0.73, green: 0.66, blue: 1.00).opacity(0.52)],
                                    startPoint: .topLeading, endPoint: .bottomTrailing),
-                    lineWidth: 1.1
+                    lineWidth: 1.0
                 )
             Group {
                 Image(systemName: "sparkle")
@@ -121,13 +125,13 @@ struct WidgetView: View {
         }
         .frame(width: 40, height: 40)
         .circularLiquidGlass(
-            tint: Color(red: 123 / 255, green: 104 / 255, blue: 238 / 255).opacity(0.66)
+            tint: Color(red: 123 / 255, green: 104 / 255, blue: 238 / 255).opacity(0.42)
         )
-        .shadow(color: Color(red: 123 / 255, green: 104 / 255, blue: 238 / 255).opacity(0.26),
-                radius: 6, y: 2.5)
+        .shadow(color: Color(red: 123 / 255, green: 104 / 255, blue: 238 / 255).opacity(0.18),
+                radius: 7, y: 3)
         .padding(4)
         .scaleEffect(store.isMiniDragging ? 1.07 : 1)
-        .animation(.spring(response: 0.22, dampingFraction: 0.70),
+        .animation(.spring(response: 0.26, dampingFraction: 0.86, blendDuration: 0.04),
                    value: store.isMiniDragging)
         .contentShape(Circle())
         .allowsHitTesting(false)
@@ -433,7 +437,7 @@ struct TodoRowView: View {
                     dragOffset = 0
                     store.moveItem(id: item.id, to: index + steps)
                 } else {
-                    withAnimation(.easeInOut(duration: 0.2)) { dragOffset = 0 }
+                    withAnimation(.spring(response: 0.24, dampingFraction: 0.90)) { dragOffset = 0 }
                 }
             }
     }

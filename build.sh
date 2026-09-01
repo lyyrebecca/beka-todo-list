@@ -22,6 +22,7 @@ lipo -create "$BUILD_DIR/LiquidTodo-arm64" "$BUILD_DIR/LiquidTodo-x86_64" \
   -output "$BIN_DIR/LiquidTodo"
 
 cp Info.plist "$APP/Contents/"
+cp Assets/LiquidTodo.icns "$APP/Contents/Resources/"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 codesign --force --deep --sign - "$APP"
 

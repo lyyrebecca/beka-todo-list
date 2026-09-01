@@ -17,6 +17,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var lastSize: CGSize = .zero
     private var isWindowTransitioning = false
 
+    /// 微动效使用接近 Apple 系统面板的快速起步、平稳收束曲线；
+    /// 在“减少动态效果”开启时直接切换，避免不必要的位移。
+    private var reducesMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    private var windowMotionDuration: TimeInterval { reducesMotion ? 0.01 : 0.32 }
+    private var componentMotion: Animation {
+        reducesMotion ? .linear(duration: 0.01)
+            : .spring(response: 0.36, dampingFraction: 0.88, blendDuration: 0.08)
+    }
+
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -271,10 +280,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.23
+            context.duration = reducesMotion ? 0.01 : 0.26
+            // 快速响应、无明显回弹：贴边时像 macOS 原生浮层一样干净收束。
             context.timingFunction = CAMediaTimingFunction(
-                controlPoints: 0.20, 0.82, 0.24, 1.00)
-            context.allowsImplicitAnimation = true
+                controlPoints: 0.16, 1.00, 0.30, 1.00)
+            context.allowsImplicitAnimation = !reducesMotion
             window.animator().setFrame(target, display: true)
         } completionHandler: { [weak self] in
             Task { @MainActor [weak self] in self?.saveFrameImmediately() }
@@ -286,7 +296,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         saveFrameImmediately()
         store.isAdding = false
         store.editingTextId = nil
-        store.isMinimized = true
+        withAnimation(componentMotion) { store.isMinimized = true }
         window.hasShadow = false
         UserDefaults.standard.set(true, forKey: "widgetMinimized")
         lastSize = .zero
@@ -296,7 +306,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func restoreWidget() {
         guard store.isMinimized else { return }
         saveFrameImmediately()
-        store.isMinimized = false
+        withAnimation(componentMotion) { store.isMinimized = false }
         window.hasShadow = true
         UserDefaults.standard.set(false, forKey: "widgetMinimized")
         lastSize = .zero
@@ -308,9 +318,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let window else { return }
         isWindowTransitioning = true
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.34
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            context.allowsImplicitAnimation = true
+            context.duration = windowMotionDuration
+            // 与 SwiftUI 内容的临界阻尼 spring 对齐：缩放和窗口尺寸在同一节奏内完成。
+            context.timingFunction = CAMediaTimingFunction(
+                controlPoints: 0.20, 0.80, 0.20, 1.00)
+            context.allowsImplicitAnimation = !reducesMotion
             window.animator().setFrame(target, display: true)
         } completionHandler: { [weak self] in
             Task { @MainActor [weak self] in

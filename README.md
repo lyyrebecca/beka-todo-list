@@ -1,5 +1,7 @@
 # 贝卡の Todo list 🌟
 
+<p align="center"><img src="public-assets/app-icon.png" width="132" alt="LiquidTodo 应用图标"></p>
+
 <p align="center">
   <strong>一款离线、本地优先的 macOS 桌面待办悬浮组件。</strong><br>
   用原生 SwiftUI + AppKit 制作，轻量常驻，收起后就是一个可拖动、会吸附边缘的紫色「干」圆球。
