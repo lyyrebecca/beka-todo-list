@@ -23,5 +23,12 @@ grep -q 'window.hasShadow = false' Sources/AppDelegate.swift
 grep -q 'snapMiniFrameToNearestEdge' Sources/AppDelegate.swift
 grep -q 'override var canBecomeMain: Bool { true }' Sources/WidgetWindow.swift
 grep -q 'makeKeyAndOrderFront' Sources/WidgetWindow.swift
-grep -q 'func activateForTextInput()' Sources/AppDelegate.swift
-echo "✅ Interaction regression guards: drag, header buttons, editing, mini mode"
+grep -q 'func activateForTextInput(responder: NSResponder? = nil)' Sources/AppDelegate.swift
+grep -q 'struct IMETextField: NSViewRepresentable' Sources/IMETextField.swift
+grep -q 'inputWindow.makeFirstResponder(responder)' Sources/AppDelegate.swift
+grep -q 'NSApp.setActivationPolicy(.regular)' Sources/AppDelegate.swift
+grep -q 'NSApp.setActivationPolicy(.accessory)' Sources/AppDelegate.swift
+grep -q 'inputContext?.activate()' Sources/IMETextField.swift
+grep -q 'IMETextField(text: \$draft.text' Sources/WidgetView.swift
+grep -q 'onRequestTextInput()' Sources/WidgetView.swift
+echo "✅ Interaction regression guards: drag, header buttons, editing, mini mode, third-party IME focus"

@@ -5,6 +5,8 @@ struct WidgetView: View {
     @ObservedObject var store: TodoStore
     var onSizeChange: (CGSize) -> Void
     var onMinimize: () -> Void
+    var onRequestTextInput: () -> Void
+    var onTextInputSessionChanged: (Bool) -> Void
     @Environment(\.colorScheme) private var scheme
 
     private var dark: Bool { scheme == .dark }
@@ -19,6 +21,12 @@ struct WidgetView: View {
             } else {
                 normalWidget
             }
+        }
+        .onChange(of: store.isAdding) { _, isAdding in
+            onTextInputSessionChanged(isAdding || store.editingTextId != nil)
+        }
+        .onChange(of: store.editingTextId) { _, editingId in
+            onTextInputSessionChanged(store.isAdding || editingId != nil)
         }
         .background(
             GeometryReader { geo in
@@ -48,7 +56,7 @@ struct WidgetView: View {
                 rows
             }
             if store.isAdding && !store.isShowingArchive {
-                AddRowView(store: store, dark: dark)
+                AddRowView(store: store, dark: dark, onRequestTextInput: onRequestTextInput)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             }
         }
@@ -183,9 +191,11 @@ struct WidgetView: View {
             .buttonStyle(.plain)
             .help("最小化为屏幕右侧圆圈")
             Button {
-                store.isAdding.toggle()
+                let willAdd = !store.isAdding
+                if willAdd { onRequestTextInput() }
+                store.isAdding = willAdd
                 store.isShowingArchive = false
-                if store.isAdding { store.isExpanded = false }
+                if willAdd { store.isExpanded = false }
             } label: {
                 Image(systemName: store.isAdding ? "xmark.circle.fill" : "plus.circle.fill")
                     .font(.system(size: 20))
@@ -635,15 +645,15 @@ struct AddRowView: View {
     @ObservedObject var store: TodoStore
     let dark: Bool
     @State private var draft = TodoDraft()
-    @FocusState private var focused: Bool
+    var onRequestTextInput: () -> Void
 
     var body: some View {
         VStack(spacing: 11) {
-            TextField("写下新待办…", text: $draft.text)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13, design: .rounded))
-                .foregroundStyle(Theme.textPrimary(dark))
-                .focused($focused)
+            IMETextField(text: $draft.text,
+                         placeholder: "写下新待办…",
+                         font: .systemFont(ofSize: 13),
+                         textColor: .labelColor,
+                         roundedBorder: false)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -671,7 +681,7 @@ struct AddRowView: View {
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
             .fill(Theme.rowFill(dark)))
-        .onAppear { DispatchQueue.main.async { focused = true } }
+        .onAppear { onRequestTextInput() }
         .onExitCommand { store.isAdding = false }
     }
 
@@ -680,7 +690,7 @@ struct AddRowView: View {
         guard !trimmed.isEmpty else { return }
         store.add(text: trimmed, priority: draft.priority, schedule: draft.schedule)
         draft = TodoDraft()
-        DispatchQueue.main.async { focused = true }
+        onRequestTextInput()
     }
 }
 
@@ -690,7 +700,6 @@ struct TodoEditorView: View {
     let item: TodoItem
     @ObservedObject var store: TodoStore
     @State private var draft: TodoDraft
-    @FocusState private var textFocused: Bool
     @Environment(\.colorScheme) private var scheme
 
     init(item: TodoItem, store: TodoStore) {
@@ -703,9 +712,12 @@ struct TodoEditorView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("编辑待办")
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
-            TextField("待办内容", text: $draft.text)
-                .textFieldStyle(.roundedBorder)
-                .focused($textFocused)
+            IMETextField(text: $draft.text,
+                         placeholder: "待办内容",
+                         font: .systemFont(ofSize: 13),
+                         textColor: .labelColor,
+                         roundedBorder: true)
+                .frame(height: 22)
             ScheduleEditorFields(draft: $draft, dark: scheme == .dark)
             HStack {
                 Button("取消") { store.editingTextId = nil }
@@ -718,7 +730,9 @@ struct TodoEditorView: View {
         }
         .padding(16)
         .frame(width: 340)
-        .onAppear { DispatchQueue.main.async { textFocused = true } }
+        .onAppear {
+            (NSApp.delegate as? AppDelegate)?.activateForTextInput()
+        }
     }
 
     private func save() {

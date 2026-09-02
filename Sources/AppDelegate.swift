@@ -71,7 +71,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let host = WidgetHostingView(rootView: WidgetView(
             store: store,
             onSizeChange: { [weak self] size in self?.setContentSize(size) },
-            onMinimize: { [weak self] in self?.minimizeWidget() }
+            onMinimize: { [weak self] in self?.minimizeWidget() },
+            onRequestTextInput: { [weak self] in self?.activateForTextInput() },
+            onTextInputSessionChanged: { [weak self] isActive in
+                self?.setTextInputSessionActive(isActive)
+            }
         ))
         host.frame = rect
         window.contentView = host
@@ -425,11 +429,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         DispatchQueue.main.async { [weak self] in self?.activateForTextInput() }
     }
 
-    private func activateForTextInput() {
+    /// Brings the accessory app into the real AppKit text-input path.  The
+    /// optional responder is an NSTextField (including the popover editor),
+    /// which must become first responder after activation for WeChat IME.
+    func activateForTextInput(responder: NSResponder? = nil) {
         guard let window else { return }
+        // An accessory app does not become the active text-input client over a
+        // full-screen Space on macOS 14+. Promote it only while text is being
+        // edited, then return to its dockless widget mode when editing ends.
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         window.makeMain()
+
+        if let inputView = responder as? NSView, let inputWindow = inputView.window {
+            inputWindow.makeKeyAndOrderFront(nil)
+            inputWindow.makeFirstResponder(responder)
+        } else if let responder {
+            window.makeFirstResponder(responder)
+        }
+    }
+
+    private func setTextInputSessionActive(_ isActive: Bool) {
+        guard !isActive else { return }
+        // Let SwiftUI finish dismissing its field/popover before hiding the
+        // temporary Dock presence used to obtain a third-party IME context.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.store.isAdding, self.store.editingTextId == nil else { return }
+            NSApp.setActivationPolicy(.accessory)
+        }
     }
 
     @objc private func toggleDesktopModeAction() { toggleDesktopMode() }

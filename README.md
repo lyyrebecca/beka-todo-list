@@ -19,7 +19,7 @@
 | **时间与提醒** | 支持截止日期、某一天、期间；可选择到时提醒、提前一天（默认 21:00）或期间内每日提醒。 |
 | **完成历史** | 完成后可在短暂撤销窗口内恢复；历史面板支持恢复、删除和清空。 |
 | **悬浮球** | 点击减号收起为紫色液态玻璃「干」圆球；可拖动，并自动吸附到屏幕左/右边缘。 |
-| **原生桌面体验** | 支持菜单栏、开机启动、桌面展示模式、深浅色外观，以及全屏应用场景下的中文输入法。 |
+| **原生桌面体验** | 支持菜单栏、开机启动、桌面展示模式、深浅色外观；全屏应用上方也可使用微信输入法等中文输入法。 |
 | **本地优先** | 不需要账号、不联网；待办只保存在你的 Mac。 |
 
 <p align="center">
@@ -29,7 +29,7 @@
 
 ## 下载与安装
 
-前往 [Releases](../../releases/latest) 下载 `LiquidTodo-macOS-universal.zip`：
+前往 [Releases](../../releases/latest) 下载 `LiquidTodo-macOS-universal-v1.4.2.zip`：
 
 1. 解压 ZIP；
 2. 将 `LiquidTodo.app` 拖入“应用程序”；
@@ -57,7 +57,7 @@ cd beka-todo-list
 open LiquidTodo.app
 ```
 
-`build.sh` 生成经过 ad-hoc 签名的 Universal `LiquidTodo.app`。发布包会额外提供 SHA-256 校验文件。
+`build.sh` 生成经过 ad-hoc 签名的 Universal `LiquidTodo.app`。发布页仅保留一个对应最新版本的 Universal 下载包。
 
 ## 开源协议
 
