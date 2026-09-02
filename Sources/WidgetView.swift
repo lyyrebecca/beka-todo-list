@@ -87,13 +87,14 @@ struct WidgetView: View {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [Color.white.opacity(0.52),
-                                 Color(red: 0.76, green: 0.70, blue: 1.00).opacity(0.48),
-                                 Color(red: 123 / 255, green: 104 / 255, blue: 238 / 255).opacity(0.58),
-                                 Color(red: 0.34, green: 0.27, blue: 0.76).opacity(0.64)],
-                        center: UnitPoint(x: 0.30, y: 0.18),
+                        // 从内到外逐步变浅，没有独立白色描边。
+                        colors: [Color(red: 0.28, green: 0.22, blue: 0.64).opacity(0.84),
+                                 Color(red: 123 / 255, green: 104 / 255, blue: 238 / 255).opacity(0.76),
+                                 Color(red: 0.66, green: 0.58, blue: 0.96).opacity(0.76),
+                                 Color(red: 0.84, green: 0.79, blue: 1.00).opacity(0.88)],
+                        center: UnitPoint(x: 0.38, y: 0.36),
                         startRadius: 0,
-                        endRadius: 36
+                        endRadius: 30
                     )
                 )
             Ellipse()
@@ -106,14 +107,6 @@ struct WidgetView: View {
                 .offset(x: -3, y: -10)
                 .blendMode(.screen)
                 .allowsHitTesting(false)
-            Circle()
-                .strokeBorder(
-                    LinearGradient(colors: [Color.white.opacity(0.88),
-                                             Color.white.opacity(0.30),
-                                             Color(red: 0.73, green: 0.66, blue: 1.00).opacity(0.52)],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing),
-                    lineWidth: 1.0
-                )
             Group {
                 Image(systemName: "sparkle")
                     .font(.system(size: 4.5, weight: .semibold))
@@ -132,11 +125,10 @@ struct WidgetView: View {
                         radius: 1.5, y: 1)
         }
         .frame(width: 40, height: 40)
-        .circularLiquidGlass(
-            tint: Color(red: 123 / 255, green: 104 / 255, blue: 238 / 255).opacity(0.42)
-        )
-        .shadow(color: Color(red: 123 / 255, green: 104 / 255, blue: 238 / 255).opacity(0.18),
-                radius: 7, y: 3)
+        // 不使用 Material/glassEffect：它会在透明窗口里产生未裁切的方形底。
+        // 圆球的玻璃感完全由由内到外变浅的径向渐变和高光构成。
+        .shadow(color: Color(red: 0.52, green: 0.43, blue: 0.80).opacity(0.20),
+                radius: 6, y: 3)
         .padding(4)
         .scaleEffect(store.isMiniDragging ? 1.07 : 1)
         .animation(.spring(response: 0.26, dampingFraction: 0.86, blendDuration: 0.04),
