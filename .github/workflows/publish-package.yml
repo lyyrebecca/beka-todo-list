@@ -42,3 +42,8 @@ jobs:
           DOCKERFILE
           docker buildx build --platform linux/amd64 --push \
             --tag "$IMAGE:$VERSION" --tag "$IMAGE:latest" -f Dockerfile.package .
+
+      - name: Make the GitHub Package public
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method PATCH "/user/packages/container/beka-todo-list" -f visibility=public
