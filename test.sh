@@ -23,6 +23,8 @@ if sed -n '/private var miniWidget/,/private var header/p' Sources/WidgetView.sw
 fi
 ! grep -q 'ultraThinMaterial, in: Circle()' Sources/WidgetView.swift
 grep -q 'static let miniSize: CGFloat = 48' Sources/AppDelegate.swift
+grep -q 'acquireSingleInstanceLock' Sources/LiquidTodoMain.swift
+grep -q 'flock(descriptor, LOCK_EX | LOCK_NB)' Sources/LiquidTodoMain.swift
 grep -q 'context.duration = windowMotionDuration' Sources/AppDelegate.swift
 grep -q 'window.hasShadow = false' Sources/AppDelegate.swift
 ! grep -q 'window.hasShadow = true' Sources/AppDelegate.swift
@@ -37,4 +39,4 @@ grep -q 'NSApp.setActivationPolicy(.accessory)' Sources/AppDelegate.swift
 grep -q 'inputContext?.activate()' Sources/IMETextField.swift
 grep -q 'IMETextField(text: \$draft.text' Sources/WidgetView.swift
 grep -q 'onRequestTextInput()' Sources/WidgetView.swift
-echo "✅ Interaction regression guards: drag, header buttons, editing, mini mode, inside-out gradient, third-party IME focus"
+echo "✅ Interaction regression guards: drag, header buttons, editing, mini mode, inside-out gradient, single-instance guard, third-party IME focus"

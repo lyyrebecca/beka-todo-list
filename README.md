@@ -29,7 +29,7 @@
 
 ## 下载与安装
 
-前往 [Releases](../../releases/latest) 下载 `LiquidTodo-macOS-universal-v1.4.3.zip`：
+前往 [Releases](../../releases/latest) 下载 `LiquidTodo-macOS-universal-v1.4.4.zip`：
 
 1. 解压 ZIP；
 2. 将 `LiquidTodo.app` 拖入“应用程序”；
