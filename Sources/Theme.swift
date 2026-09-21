@@ -50,28 +50,14 @@ enum Theme {
 }
 
 extension View {
-    @ViewBuilder
+    /// Keep the release build compatible with the macOS 14 SDK used in CI.
+    /// Newer systems still render this native translucent material with the app's own highlights.
     func liquidGlass(corner: CGFloat = Theme.corner, tint: Color? = nil) -> some View {
-        if #available(macOS 26.0, *) {
-            if let tint {
-                self.glassEffect(.regular.tint(tint),
-                                 in: RoundedRectangle(cornerRadius: corner, style: .continuous))
-            } else {
-                self.glassEffect(.regular,
-                                 in: RoundedRectangle(cornerRadius: corner, style: .continuous))
-            }
-        } else {
-            self.background(.ultraThinMaterial,
-                            in: RoundedRectangle(cornerRadius: corner, style: .continuous))
-        }
+        self.background(.ultraThinMaterial,
+                        in: RoundedRectangle(cornerRadius: corner, style: .continuous))
     }
 
-    @ViewBuilder
     func circularLiquidGlass(tint: Color) -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(.regular.tint(tint), in: Circle())
-        } else {
-            self.background(.ultraThinMaterial, in: Circle())
-        }
+        self.background(.ultraThinMaterial, in: Circle())
     }
 }
