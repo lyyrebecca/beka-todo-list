@@ -1,0 +1,38 @@
+name: Build release assets
+on:
+  workflow_dispatch:
+    inputs:
+      version: { description: Release version, required: true, default: v2.0.0 }
+      publish: { description: Publish after review, required: true, type: boolean, default: false }
+permissions: { contents: write }
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - run: dotnet test windows/LiquidTodo.Windows.sln -c Release
+      - run: dotnet publish windows/src/LiquidTodo.Windows/LiquidTodo.Windows.csproj -c Release -r win-x64 --self-contained true -o windows/publish
+      - run: choco install innosetup --no-progress -y; iscc windows/installer/LiquidTodo.iss
+      - run: New-Item -ItemType Directory release/portable; Copy-Item windows/publish/* release/portable -Recurse; New-Item release/portable/portable.flag -ItemType File; Compress-Archive release/portable/* release/LiquidTodo-Windows-x64-Portable-v2.0.0.zip
+      - uses: actions/upload-artifact@v4
+        with: { name: windows-release, path: release }
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./test.sh && ./build.sh && codesign --verify --deep --strict LiquidTodo.app
+      - run: mkdir release && ditto -c -k --sequesterRsrc --keepParent LiquidTodo.app release/LiquidTodo-macOS-universal-v2.0.0.zip && shasum -a 256 release/* > release/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: macos-release, path: release }
+  release:
+    if: inputs.publish
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: release }
+      - run: find release -type f -print0 | xargs -0 sha256sum > SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with: { tag_name: '${{ inputs.version }}', draft: true, files: 'release/**/*\nSHA256SUMS.txt' }

@@ -34,6 +34,7 @@ struct WidgetView: View {
             }
         )
         .onPreferenceChange(ContentSizeKey.self) { onSizeChange($0) }
+        .sheet(isPresented: $store.isShowingNameSetup) { NameSetupView(store: store) }
         .transition(.opacity.combined(with: .scale(scale: 0.94)))
         // 临界阻尼，避免缩小/恢复时出现“果冻式”二次回弹。
         .animation(.spring(response: 0.36, dampingFraction: 0.88, blendDuration: 0.08),
@@ -143,7 +144,7 @@ struct WidgetView: View {
             Image(systemName: "sparkles")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.accent(dark))
-            Text("贝卡の Todo list 🌟")
+            Text(store.displayName)
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(Theme.textPrimary(dark))
             if !store.items.isEmpty {
@@ -175,6 +176,13 @@ struct WidgetView: View {
             }
             .buttonStyle(.plain)
             .help(store.isShowingArchive ? "返回待办" : "查看已完成")
+            Button { store.isShowingNameSetup = true } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Theme.textSecondary(dark))
+            }
+            .buttonStyle(.plain)
+            .help("自定义待办名称")
             Button(action: onMinimize) {
                 Image(systemName: "minus.circle.fill")
                     .font(.system(size: 18))
@@ -732,5 +740,36 @@ struct TodoEditorView: View {
         guard !trimmed.isEmpty else { return }
         store.update(item.id, text: trimmed, priority: draft.priority, schedule: draft.schedule)
         store.editingTextId = nil
+    }
+}
+
+
+struct NameSetupView: View {
+    @ObservedObject var store: TodoStore
+    @State private var name = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(Color(red: 123 / 255, green: 104 / 255, blue: 238 / 255))
+            Text("给你的 Todo list 取个名字")
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+            Text("默认是「贝卡の Todo list」。填写名字后会显示为「你的名字の Todo list」。之后可点标题栏齿轮随时修改。")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            TextField("例如：小王", text: $name)
+                .textFieldStyle(.roundedBorder)
+            HStack {
+                Spacer()
+                Button("使用默认") { store.setOwnerName("贝卡") }
+                Button("保存") { store.setOwnerName(name) }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24)
+        .frame(width: 390)
+        .onAppear { name = store.ownerName }
     }
 }

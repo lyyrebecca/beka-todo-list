@@ -1,64 +1,67 @@
 # 贝卡の Todo list 🌟
 
-<p align="center"><img src="public-assets/app-icon.png" width="132" alt="LiquidTodo 应用图标"></p>
+<p align="center"><img src="public-assets/app-icon.png" width="132" alt="贝卡の Todo list 图标"></p>
 
-<p align="center">
-  <strong>一款离线、本地优先的 macOS 桌面待办悬浮组件。</strong><br>
-  用原生 SwiftUI + AppKit 制作，轻量常驻，收起后就是一个可拖动、会吸附边缘的紫色「干」圆球。
-</p>
+<p align="center"><strong>离线、本地优先的 Mac / Windows 桌面待办。</strong><br>收起后是可拖动、自动贴边的紫色「干」悬浮球。</p>
 
-<p align="center">
-  <img src="public-assets/screenshots/todo-panel.png" width="560" alt="贝卡 Todo list 的真实待办面板截图">
-</p>
+<p align="center"><img src="public-assets/screenshots/todo-panel.png" width="520" alt="贝卡の Todo list 主界面"></p>
 
-## 功能一览
+## 选哪个下载？
 
-| | |
-|---|---|
-| **创建、编辑、拖动排序** | 新建或编辑时可完整修改标题、时间与重要级别；重要和紧急事项自动置顶。 |
-| **时间与提醒** | 支持截止日期、某一天、期间；可选择到时提醒、提前一天（默认 21:00）或期间内每日提醒。 |
-| **完成历史** | 完成后可在短暂撤销窗口内恢复；历史面板支持恢复、删除和清空。 |
-| **悬浮球** | 点击减号收起为紫色液态玻璃「干」圆球；可拖动，并自动吸附到屏幕左/右边缘。 |
-| **原生桌面体验** | 支持菜单栏、开机启动、桌面展示模式、深浅色外观；全屏应用上方也可使用微信输入法等中文输入法。 |
-| **本地优先** | 不需要账号、不联网；待办只保存在你的 Mac。 |
+| 你的电脑 | 下载文件 | 适合谁 | 打开方式 |
+|---|---|---|---|
+| **Mac（Intel 或 Apple 芯片）** | `LiquidTodo-macOS-universal-v2.0.0.zip` | 所有 Mac 用户 | 解压后把 `LiquidTodo.app` 拖进“应用程序”，双击打开。 |
+| **Windows 10 22H2 / Windows 11 x64** | `LiquidTodo-Windows-x64-Setup-v2.0.0.exe` | 推荐，大多数 Windows 用户 | 双击安装器，按提示安装；可选桌面快捷方式与开机启动。 |
+| **Windows 10 22H2 / Windows 11 x64** | `LiquidTodo-Windows-x64-Portable-v2.0.0.zip` | 不想安装、想放 U 盘 | 解压整个文件夹，双击 `LiquidTodo.exe`；不要移动或删除同级 `Data/`。 |
 
-<p align="center">
-  <img src="public-assets/screenshots/time-and-priority.png" width="360" alt="时间模式和重要级别的真实创建界面截图">
-  <img src="public-assets/screenshots/mini-orb.png" width="180" alt="收起后的紫色干悬浮球真实截图">
-</p>
+> **Windows 首版无需安装 .NET。** 若 SmartScreen 显示“未知发布者”，点击 **更多信息 → 仍要运行**；这是因为首版尚未使用 Authenticode 证书。只从 [Releases](../../releases/latest) 下载，并用 `SHA256SUMS.txt` 核对文件。
 
-## 下载与安装
+## 三步开始使用
 
-前往 [Releases](../../releases/latest) 下载 `LiquidTodo-macOS-universal-v1.4.4.zip`：
+1. 下载上表中与你的系统对应的文件并打开应用。
+2. 第一次启动会询问名称：可用默认“贝卡”，也可填写“小王”，标题即显示为“小王の Todo list”。之后随时点标题栏 **⚙** 修改。
+3. 点 **＋** 新建待办；可设普通 / 重要 / 紧急、截止日期 / 某一天 / 期间，以及到时、前一天 21:00、期间每日提醒。
 
-1. 解压 ZIP；
-2. 将 `LiquidTodo.app` 拖入“应用程序”；
-3. 双击运行。首次从 GitHub 下载的版本如被 macOS 拦截，在 App 上**右键 → 打开**即可。
+### 日常操作
 
-## 系统要求
+- **编辑**：点击待办文字；标题、级别、日期、时间和提醒均可修改。
+- **排序**：拖动每条最右侧的 `⋮⋮` 手柄；重要 / 紧急项目创建后自动置顶。
+- **收起**：点 `−` 变为紫色「干」圆球，拖到屏幕边缘会自动吸附；点击圆球恢复。
+- **完成**：勾选后有 4 秒撤销窗口；完成历史可恢复或清空。
+- **备份**：托盘菜单中选择“导出备份 / 导入备份”。导入默认安全合并，按 UUID 去重，导入前自动备份本机数据。
 
-- macOS 14 或更新版本
-- Apple Silicon 和 Intel Mac（Universal Binary）
-- 在 macOS 26 可使用系统 Liquid Glass；较旧系统会自动使用半透明材质回退效果
+## 功能
 
-## 隐私与数据
+| 能力 | macOS | Windows x64 |
+|---|---:|---:|
+| 创建、完整编辑、拖动排序、三级重要度 | ✅ | ✅ |
+| 截止日期、某一天、期间与提醒 | ✅ | ✅ |
+| 完成、4 秒撤销、历史恢复 | ✅ | ✅ |
+| 中文输入法、悬浮球、托盘、开机启动 | ✅ | ✅ |
+| 自定义 `xxの Todo list` 名称 | ✅ | ✅ |
+| 跨平台 JSON 导入 / 导出 | ✅ | ✅ |
 
-- 应用不收集数据、不上传待办、不含分析或广告 SDK。
-- 本地数据保存在：`~/Library/Application Support/LiquidTodo/data.json`
-- 本仓库不包含任何个人待办、备份、开发环境文件或本机路径。
+## 数据与隐私
 
-## 从源码构建
+完全离线：无账号、遥测、广告、云同步或自动更新。
+
+- **Mac**：`~/Library/Application Support/LiquidTodo/`
+- **Windows 安装版**：`%LOCALAPPDATA%\LiquidTodo\`
+- **Windows 便携版**：应用同级 `Data/`
+
+备份格式为 [LiquidTodo Backup v1](shared/backup-schema/liquidtodo-backup-v1.schema.json)，可在 Mac 和 Windows 间手动迁移。
+
+## 开发与验证
 
 ```bash
-git clone https://github.com/lyyrebecca/beka-todo-list.git
-cd beka-todo-list
-./test.sh
-./build.sh
-open LiquidTodo.app
+# macOS
+./test.sh && ./build.sh
+
+# Windows（Windows x64 上）
+dotnet test windows/LiquidTodo.Windows.sln
+dotnet publish windows/src/LiquidTodo.Windows -c Release -r win-x64 --self-contained true
 ```
 
-`build.sh` 生成经过 ad-hoc 签名的 Universal `LiquidTodo.app`。发布页仅保留一个对应最新版本的 Universal 下载包。
-
-## 开源协议
+Windows CI 会跑单元测试并构建自包含发布产物；最新通过记录见 [Actions](../../actions)。
 
 [MIT](LICENSE)

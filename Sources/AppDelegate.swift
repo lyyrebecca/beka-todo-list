@@ -154,7 +154,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let headerHeight: CGFloat = 54
         // 标题区域可拖动；右侧整组按钮必须交给 SwiftUI 处理。
         // 旧实现只排除了最右侧 48pt，导致“已完成历史”按钮被窗口拖动监视器吞掉。
-        let controlsWidth: CGFloat = 136
+        let controlsWidth: CGFloat = 168
         let draggableRect = NSRect(x: f.minX, y: f.maxY - headerHeight,
                                    width: f.width - controlsWidth, height: headerHeight)
         return draggableRect.contains(screenPoint)
@@ -389,6 +389,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         launchItem.state = autoLaunchEnabled ? .on : .off
         menu.addItem(launchItem)
 
+        let nameItem = NSMenuItem(title: "自定义待办名称…",
+                                  action: #selector(customizeOwnerName), keyEquivalent: "")
+        nameItem.target = self
+        menu.addItem(nameItem)
+        let exportItem = NSMenuItem(title: "导出备份…", action: #selector(exportBackup), keyEquivalent: "")
+        exportItem.target = self; menu.addItem(exportItem)
+        let importItem = NSMenuItem(title: "导入备份…", action: #selector(importBackup), keyEquivalent: "")
+        importItem.target = self; menu.addItem(importItem)
+
         menu.addItem(.separator())
 
         let clearItem = NSMenuItem(title: "清空已完成（\(store.archived.count)）",
@@ -480,6 +489,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func clearArchived() { store.clearArchived() }
+
+    @objc private func exportBackup() {
+        let panel = NSSavePanel(); panel.nameFieldStringValue = "LiquidTodo-Backup.json"; panel.allowedContentTypes = [.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do { try store.exportBackup(to: url) } catch { NSAlert(error: error).runModal() }
+    }
+
+    @objc private func importBackup() {
+        let panel = NSOpenPanel(); panel.allowedContentTypes = [.json]; panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let alert = NSAlert(); alert.messageText = "导入待办"; alert.informativeText = "默认安全合并并按 UUID 去重。选择“替换全部”会先自动备份本机数据。"; alert.addButton(withTitle: "合并导入"); alert.addButton(withTitle: "替换全部"); alert.addButton(withTitle: "取消")
+        let answer = alert.runModal(); guard answer != .alertThirdButtonReturn else { return }
+        do { try store.importBackup(from: url, replacing: answer == .alertSecondButtonReturn) } catch { NSAlert(error: error).runModal() }
+    }
+
+    @objc private func customizeOwnerName() {
+        let alert = NSAlert()
+        alert.messageText = "自定义待办名称"
+        alert.informativeText = "填写名称后，标题会显示为「你的名字の Todo list」。"
+        let input = NSTextField(string: store.ownerName)
+        input.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
+        alert.accessoryView = input
+        alert.addButton(withTitle: "保存")
+        alert.addButton(withTitle: "取消")
+        if alert.runModal() == .alertFirstButtonReturn { store.setOwnerName(input.stringValue) }
+    }
 
     @objc private func quit() { NSApp.terminate(nil) }
 }

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LiquidTodo Backup v1",
+  "type": "object",
+  "required": ["schemaVersion", "exportedAt", "items", "archived"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "exportedAt": { "type": "string", "format": "date-time" },
+    "items": { "$ref": "#/$defs/items" },
+    "archived": { "$ref": "#/$defs/items" }
+  },
+  "$defs": {
+    "items": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+    "item": { "type": "object", "required": ["id", "text", "createdAt", "priority", "completed"], "properties": {
+      "id": { "type": "string", "format": "uuid" }, "text": { "type": "string", "minLength": 1 },
+      "createdAt": { "type": "string", "format": "date-time" }, "completedAt": { "type": ["string", "null"], "format": "date-time" },
+      "priority": { "enum": ["normal", "important", "urgent"] }, "completed": { "type": "boolean" },
+      "schedule": { "$ref": "#/$defs/schedule" }
+    }},
+    "schedule": { "type": ["object", "null"], "properties": {
+      "mode": { "enum": ["none", "deadline", "day", "period"] }, "date": { "type": ["string", "null"], "format": "date-time" },
+      "startDate": { "type": ["string", "null"], "format": "date" }, "endDate": { "type": ["string", "null"], "format": "date" },
+      "reminderMode": { "enum": ["none", "atTime", "dayBefore", "dailyDuringPeriod"] }, "reminderTimeMinutes": { "type": "integer", "minimum": 0, "maximum": 1439 }
+    }}
+  }
+}
