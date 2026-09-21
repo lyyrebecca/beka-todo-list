@@ -9,7 +9,7 @@
     <AssemblyName>LiquidTodo</AssemblyName>
     <RootNamespace>LiquidTodo.Windows</RootNamespace>
     <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <ImplicitUsings>disable</ImplicitUsings>
     <PublishSingleFile>false</PublishSingleFile>
     <SelfContained>true</SelfContained>
   </PropertyGroup>

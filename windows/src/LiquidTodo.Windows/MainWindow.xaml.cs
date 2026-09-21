@@ -97,7 +97,7 @@ public partial class MainWindow : Window
 
     private static ControlTemplate CreateHandleTemplate()
     {
-        var factory = new FrameworkElementFactory(typeof(TextBlock)); factory.SetValue(TextBlock.TextProperty, "⋮⋮"); factory.SetValue(TextBlock.ForegroundProperty, Brushes.Gray); factory.SetValue(TextBlock.FontSizeProperty, 12d); factory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center); factory.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center); return new ControlTemplate(typeof(Thumb)) { VisualTree = factory };
+        var factory = new FrameworkElementFactory(typeof(TextBlock)); factory.SetValue(TextBlock.TextProperty, "⋮⋮"); factory.SetValue(TextBlock.ForegroundProperty, Brushes.Gray); factory.SetValue(TextBlock.FontSizeProperty, 12d); factory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center); factory.SetValue(TextBlock.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Center); return new ControlTemplate(typeof(Thumb)) { VisualTree = factory };
     }
 
     private Border CreateArchiveRow(TodoItem item)

@@ -16,8 +16,8 @@ internal sealed class TrayService : IDisposable
             menu.Items.Clear();
             menu.Items.Add("显示 / 隐藏", null, (_, _) => showHide());
             menu.Items.Add("添加待办", null, (_, _) => add());
-            var desktopItem = menu.Items.Add("沉入桌面（纯展示，不可点击）", null, (_, _) => desktop()); desktopItem.Checked = desktopEnabled();
-            var startupItem = menu.Items.Add("开机自动启动", null, (_, _) => startup()); startupItem.Checked = startupEnabled();
+            var desktopItem = (Forms.ToolStripMenuItem)menu.Items.Add("沉入桌面（纯展示，不可点击）", null, (_, _) => desktop()); desktopItem.Checked = desktopEnabled();
+            var startupItem = (Forms.ToolStripMenuItem)menu.Items.Add("开机自动启动", null, (_, _) => startup()); startupItem.Checked = startupEnabled();
             menu.Items.Add(new Forms.ToolStripSeparator());
             menu.Items.Add("导入备份…", null, (_, _) => import());
             menu.Items.Add("导出备份…", null, (_, _) => export());
