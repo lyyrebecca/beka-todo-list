@@ -35,4 +35,6 @@ jobs:
         with: { path: release }
       - run: find release -type f -print0 | xargs -0 sha256sum > SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
-        with: { tag_name: '${{ inputs.version }}', draft: true, files: 'release/**/*\nSHA256SUMS.txt' }
+        with: { tag_name: '${{ inputs.version }}', draft: true, files: |
+            release/**/*
+            SHA256SUMS.txt }
