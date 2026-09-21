@@ -5,7 +5,7 @@ using LiquidTodo.Windows.Services;
 
 namespace LiquidTodo.Windows;
 
-public partial class App : Application
+public partial class App : System.Windows.Application
 {
     private const string InstanceName = "com.beka.liquidtodo.windows.v2";
     private Mutex? _mutex;

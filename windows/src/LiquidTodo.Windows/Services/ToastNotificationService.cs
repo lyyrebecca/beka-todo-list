@@ -6,7 +6,7 @@ namespace LiquidTodo.Windows.Services;
 /// <summary>Uses the stable AUMID for native toasts; resident timers remain a deterministic fallback for unpackaged installs.</summary>
 internal sealed class ToastNotificationService : IDisposable
 {
-    private readonly Dictionary<string, Timer> _timers = [];
+    private readonly Dictionary<string, System.Threading.Timer> _timers = [];
     private readonly Action<string, string> _fallback;
     public bool NativeRegistrationAvailable { get; private set; } = true;
     public ToastNotificationService(Action<string, string> fallback) => _fallback = fallback;
@@ -18,7 +18,7 @@ internal sealed class ToastNotificationService : IDisposable
         {
             var due = request.At - DateTimeOffset.Now;
             if (due <= TimeSpan.Zero) continue;
-            _timers[request.Identifier] = new Timer(_ => Deliver(request), null, due, Timeout.InfiniteTimeSpan);
+            _timers[request.Identifier] = new System.Threading.Timer(_ => Deliver(request), null, due, Timeout.InfiniteTimeSpan);
         }
     }
 

@@ -23,7 +23,7 @@ public partial class MainWindow : Window
     private readonly TrayService _tray;
     private readonly ToastNotificationService _toasts;
     private readonly Dictionary<Guid, System.Windows.Threading.DispatcherTimer> _undoTimers = [];
-    private Point _orbStartMouse, _orbStartWindow;
+    private System.Windows.Point _orbStartMouse, _orbStartWindow;
     private bool _orbDragging;
     private bool _ready;
 
@@ -31,7 +31,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _paths = paths; _store = store; _settingsService = new SettingsService(paths.SettingsFile); _settings = _settingsService.Load();
-        _tray = new TrayService(Path.Combine(AppContext.BaseDirectory, "LiquidTodo.ico"), ToggleVisible, StartAdd, ToggleDesktopMode, () => _settings.DesktopMode, ToggleStartup, () => _startup.IsEnabled, ImportBackup, ExportBackup, ClearArchived, () => Application.Current.Shutdown());
+        _tray = new TrayService(Path.Combine(AppContext.BaseDirectory, "LiquidTodo.ico"), ToggleVisible, StartAdd, ToggleDesktopMode, () => _settings.DesktopMode, ToggleStartup, () => _startup.IsEnabled, ImportBackup, ExportBackup, ClearArchived, () => System.Windows.Application.Current.Shutdown());
         _toasts = new ToastNotificationService(_tray.Balloon);
         _store.Changed += (_, _) => Dispatcher.Invoke(Render);
         Loaded += (_, _) =>
@@ -113,7 +113,7 @@ public partial class MainWindow : Window
     private void MoveFromHandle(Guid id)
     {
         var point = Mouse.GetPosition(ItemsHost); var target = 0;
-        foreach (var element in ItemsHost.Children.OfType<Border>()) { if (point.Y > element.TranslatePoint(new Point(0, 0), ItemsHost).Y + element.ActualHeight / 2) target++; }
+        foreach (var element in ItemsHost.Children.OfType<Border>()) { if (point.Y > element.TranslatePoint(new System.Windows.Point(0, 0), ItemsHost).Y + element.ActualHeight / 2) target++; }
         _store.Move(id, target);
     }
     private string LabelFor(TodoItem item)
@@ -168,7 +168,7 @@ public partial class MainWindow : Window
     }
 
     private void Orb_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { _orbStartMouse = PointToScreen(e.GetPosition(this)); _orbStartWindow = new Point(Left, Top); _orbDragging = false; Orb.CaptureMouse(); }
-    private void Orb_MouseMove(object sender, MouseEventArgs e) { if (!Orb.IsMouseCaptured || e.LeftButton != MouseButtonState.Pressed) return; var now = PointToScreen(e.GetPosition(this)); var dx = now.X - _orbStartMouse.X; var dy = now.Y - _orbStartMouse.Y; if (Math.Abs(dx) + Math.Abs(dy) > 2) _orbDragging = true; Left = _orbStartWindow.X + dx; Top = _orbStartWindow.Y + dy; }
+    private void Orb_MouseMove(object sender, System.Windows.Input.MouseEventArgs e) { if (!Orb.IsMouseCaptured || e.LeftButton != MouseButtonState.Pressed) return; var now = PointToScreen(e.GetPosition(this)); var dx = now.X - _orbStartMouse.X; var dy = now.Y - _orbStartMouse.Y; if (Math.Abs(dx) + Math.Abs(dy) > 2) _orbDragging = true; Left = _orbStartWindow.X + dx; Top = _orbStartWindow.Y + dy; }
     private void Orb_MouseLeftButtonUp(object sender, MouseButtonEventArgs e) { Orb.ReleaseMouseCapture(); if (_orbDragging) SnapOrb(true); else SetMinimized(false, true); }
     private void SnapOrb(bool animate)
     {
@@ -192,5 +192,5 @@ public partial class MainWindow : Window
     }
     private void SavePosition() { _settings = _settings with { Left = Left, Top = Top }; _settingsService.Save(_settings); }
     protected override void OnLocationChanged(EventArgs e) { base.OnLocationChanged(e); if (_ready) SavePosition(); }
-    protected override void OnKeyDown(KeyEventArgs e) { if (e.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control) { StartAdd(); e.Handled = true; } base.OnKeyDown(e); }
+    protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e) { if (e.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control) { StartAdd(); e.Handled = true; } base.OnKeyDown(e); }
 }

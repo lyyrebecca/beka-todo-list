@@ -48,6 +48,6 @@ public partial class TodoEditorWindow : Window
         DialogResult = true;
     }
     private void Cancel_Click(object sender, RoutedEventArgs e) => DialogResult = false;
-    private static void Select(ComboBox box, Enum value) => box.SelectedItem = box.Items.Cast<ComboBoxItem>().First(x => string.Equals(x.Tag?.ToString(), value.ToString(), StringComparison.OrdinalIgnoreCase));
-    private static T ParseEnum<T>(ComboBox box) where T : struct, Enum => Enum.Parse<T>(((ComboBoxItem)box.SelectedItem).Tag!.ToString()!, true);
+    private static void Select(System.Windows.Controls.ComboBox box, Enum value) => box.SelectedItem = box.Items.Cast<ComboBoxItem>().First(x => string.Equals(x.Tag?.ToString(), value.ToString(), StringComparison.OrdinalIgnoreCase));
+    private static T ParseEnum<T>(System.Windows.Controls.ComboBox box) where T : struct, Enum => Enum.Parse<T>(((ComboBoxItem)box.SelectedItem).Tag!.ToString()!, true);
 }
