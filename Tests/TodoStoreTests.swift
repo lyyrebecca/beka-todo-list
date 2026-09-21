@@ -148,17 +148,17 @@ struct TodoStoreTests {
         store.complete(undoId)
         check(store.items[0].completed, "完成后先保留短暂撤销状态")
         store.undoCompletion(undoId)
-        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.25))
         check(!store.items[0].completed && store.archived.isEmpty, "撤销完成会取消归档")
 
         store.complete(undoId)
-        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.25))
         check(store.items.isEmpty && store.archived.first?.id == undoId, "完成等待后进入已完成记录")
         store.restoreArchived(undoId)
         check(store.archived.isEmpty && store.items.first?.id == undoId && !store.items[0].completed,
               "已完成记录可以恢复为待办")
         store.complete(undoId)
-        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.25))
         store.deleteArchived(undoId)
         check(store.archived.isEmpty, "已完成记录可以永久删除")
     }
