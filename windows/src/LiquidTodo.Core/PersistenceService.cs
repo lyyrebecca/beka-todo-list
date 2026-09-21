@@ -18,7 +18,7 @@ public sealed class PersistenceService
                 ?? new TodoSnapshot([], []);
             return Normalize(snapshot);
         }
-        catch (Exception) when (ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             var corrupt = $"{DataFile}.corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
             try { File.Move(DataFile, corrupt); RecoveredCorruptFile = corrupt; } catch { /* retain original if isolation fails */ }
