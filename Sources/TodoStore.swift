@@ -46,6 +46,10 @@ final class TodoStore: ObservableObject {
     @Published var draggingId: UUID? = nil
     @Published private(set) var now = Date()
     @Published private(set) var persistenceError: String?
+    @Published private(set) var ownerName: String
+    @Published var isShowingNameSetup: Bool
+
+    var displayName: String { "\(ownerName)の Todo list 🌟" }
 
     let maxVisible = 10
     private let fileURL: URL
@@ -76,6 +80,9 @@ final class TodoStore: ObservableObject {
         }
         self.notificationScheduler = notificationScheduler
         self.completionArchiveDelay = completionArchiveDelay
+        let savedOwner = UserDefaults.standard.string(forKey: "todoOwnerName")
+        self.ownerName = savedOwner?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? savedOwner! : "贝卡"
+        self.isShowingNameSetup = savedOwner == nil
         load()
         if startClock { startClockTimer() }
         rescheduleFutureNotifications()
@@ -88,6 +95,13 @@ final class TodoStore: ObservableObject {
     }
 
     var overflowCount: Int { max(0, items.count - maxVisible) }
+
+    func setOwnerName(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        ownerName = trimmed.isEmpty ? "贝卡" : String(trimmed.prefix(20))
+        UserDefaults.standard.set(ownerName, forKey: "todoOwnerName")
+        isShowingNameSetup = false
+    }
 
     func isOverdue(_ item: TodoItem) -> Bool {
         if item.schedule?.mode == .period, let end = item.schedule?.endDate,
@@ -211,6 +225,30 @@ final class TodoStore: ObservableObject {
     func clearArchived() {
         archived.removeAll()
         save()
+    }
+
+    func exportBackup(to url: URL) throws {
+        let backup = TodoBackupV1(exportedAt: TodoBackupItem.iso(Date()),
+                                  items: items.map(TodoBackupItem.init), archived: archived.map(TodoBackupItem.init))
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(backup).write(to: url, options: .atomic)
+    }
+
+    /// 导入前先在同目录自动保留本机快照；默认合并，UUID 相同则保留本机记录。
+    func importBackup(from url: URL, replacing: Bool) throws {
+        let decoder = JSONDecoder()
+        let backup = try decoder.decode(TodoBackupV1.self, from: Data(contentsOf: url))
+        guard backup.schemaVersion == TodoBackupV1.schemaVersion else { throw CocoaError(.fileReadCorruptFile) }
+        let safety = fileURL.deletingLastPathComponent().appendingPathComponent("LiquidTodo-auto-backup-\(Int(Date().timeIntervalSince1970)).json")
+        try exportBackup(to: safety)
+        var known = Set((replacing ? [] : items + archived).map(\.id))
+        let incomingItems = backup.items.compactMap { $0.todoItem() }.filter { known.insert($0.id).inserted }
+        let incomingArchived = backup.archived.compactMap { $0.todoItem() }.filter { known.insert($0.id).inserted }
+        if replacing { items = []; archived = [] }
+        for var item in incomingItems { item.completed = false; item.completedAt = nil; insertByPriority(item) }
+        archived.append(contentsOf: incomingArchived)
+        archived.sort { ($0.completedAt ?? $0.createdAt) > ($1.completedAt ?? $1.createdAt) }
+        rescheduleFutureNotifications(); save()
     }
 
     private func insertByPriority(_ item: TodoItem) {

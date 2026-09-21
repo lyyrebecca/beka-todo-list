@@ -6,16 +6,18 @@ BIN="${TMPDIR:-/tmp}/LiquidTodoTests-$$"
 trap 'rm -f "$BIN"' EXIT
 
 xcrun swiftc -swift-version 5 -target "$(uname -m)-apple-macos14.0" \
-  -o "$BIN" Sources/TodoItem.swift Sources/TodoDraft.swift Sources/TodoStore.swift \
+  -o "$BIN" Sources/TodoItem.swift Sources/TodoDraft.swift Sources/TodoBackup.swift Sources/TodoStore.swift \
   Tests/TodoStoreTests.swift
 "$BIN"
 
 grep -q 'isMovableByWindowBackground = false' Sources/AppDelegate.swift
-grep -q 'let controlsWidth: CGFloat = 136' Sources/AppDelegate.swift
+grep -q 'let controlsWidth: CGFloat = 168' Sources/AppDelegate.swift
 grep -q 'Button(action: beginEditing)' Sources/WidgetView.swift
 grep -q 'func minimizeWidget()' Sources/AppDelegate.swift
 grep -q 'func restoreWidget()' Sources/AppDelegate.swift
 grep -q 'Text("干")' Sources/WidgetView.swift
+grep -q 'displayName' Sources/WidgetView.swift
+grep -q 'setOwnerName' Sources/TodoStore.swift
 grep -q '从内到外逐步变浅' Sources/WidgetView.swift
 if sed -n '/private var miniWidget/,/private var header/p' Sources/WidgetView.swift | grep -q 'strokeBorder'; then
   echo 'mini orb must not add an outline' >&2

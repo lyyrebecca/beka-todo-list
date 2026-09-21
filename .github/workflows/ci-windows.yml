@@ -1,0 +1,16 @@
+name: Windows build and tests
+on:
+  push: { branches: [main, feature/windows-v2] }
+  pull_request:
+  workflow_dispatch:
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - run: dotnet test windows/LiquidTodo.Windows.sln -c Release
+      - run: dotnet publish windows/src/LiquidTodo.Windows/LiquidTodo.Windows.csproj -c Release -r win-x64 --self-contained true -o windows/publish
+      - uses: actions/upload-artifact@v4
+        with: { name: LiquidTodo-Windows-x64-publish, path: windows/publish }

@@ -21,3 +21,9 @@ xcuserdata/
 
 # Local social-card working files
 .postplus/
+
+# Windows build and install outputs
+windows/**/bin/
+windows/**/obj/
+windows/publish/
+windows/release/

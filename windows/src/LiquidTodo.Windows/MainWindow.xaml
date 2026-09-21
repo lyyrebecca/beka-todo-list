@@ -1,0 +1,35 @@
+<Window x:Class="LiquidTodo.Windows.MainWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:controls="clr-namespace:System.Windows.Controls;assembly=PresentationFramework"
+ Title="贝卡の Todo list" Width="362" Height="430" WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True">
+ <Window.Resources>
+  <Style x:Key="HeaderButton" TargetType="Button"><Setter Property="Foreground" Value="#625B73"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="FontSize" Value="16"/><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Cursor" Value="Hand"/></Style>
+ </Window.Resources>
+ <Grid>
+  <Border x:Name="Panel" Width="350" CornerRadius="22" Background="#F7F5FC" BorderBrush="#26FFFFFF" BorderThickness="1" Padding="16" HorizontalAlignment="Left" VerticalAlignment="Top">
+   <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="*"/><RowDefinition Height="42"/></Grid.RowDefinitions>
+    <Grid Grid.Row="0" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="132"/></Grid.ColumnDefinitions>
+     <StackPanel><TextBlock x:Name="NameTitle" Text="贝卡の Todo list" FontSize="17" FontWeight="SemiBold" Foreground="#29213B"/><TextBlock x:Name="SubTitle" Text="今天，把一件事做好" FontSize="11" Foreground="#786F8A" Margin="0,2,0,0"/></StackPanel>
+     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+      <Button x:Name="ArchiveButton" Style="{StaticResource HeaderButton}" ToolTip="完成历史" Click="ArchiveButton_Click" Content="◷"/>
+      <Button Style="{StaticResource HeaderButton}" ToolTip="自定义待办名称" Click="CustomizeNameButton_Click" Content="⚙"/>
+      <Button Style="{StaticResource HeaderButton}" ToolTip="沉入桌面" Click="DesktopButton_Click" Content="⌁"/>
+      <Button Style="{StaticResource HeaderButton}" ToolTip="收起为悬浮球" Click="MinimizeButton_Click" Content="−"/>
+     </StackPanel>
+    </Grid>
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8,0,8"><StackPanel x:Name="ItemsHost"/></ScrollViewer>
+    <Button Grid.Row="2" x:Name="AddButton" Click="AddButton_Click" Background="#7B68EE" Foreground="White" BorderThickness="0" FontSize="14" FontWeight="SemiBold" Content="＋  新建待办" Cursor="Hand"/>
+   </Grid>
+  </Border>
+  <Grid x:Name="Orb" Width="48" Height="48" Visibility="Collapsed" MouseLeftButtonDown="Orb_MouseLeftButtonDown" MouseMove="Orb_MouseMove" MouseLeftButtonUp="Orb_MouseLeftButtonUp" Cursor="Hand">
+   <Ellipse>
+    <Ellipse.Fill><RadialGradientBrush GradientOrigin="0.31,0.25" Center="0.5,0.5" RadiusX="0.65" RadiusY="0.65"><GradientStop Color="#D2CAFF" Offset="0"/><GradientStop Color="#9B8EF4" Offset="0.43"/><GradientStop Color="#7B68EE" Offset="0.72"/><GradientStop Color="#C1B8FF" Offset="1"/></RadialGradientBrush></Ellipse.Fill>
+   </Ellipse>
+   <Ellipse Margin="3" Opacity="0.42"><Ellipse.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#A9A0F9" Offset="0"/><GradientStop Color="#6B5BCA" Offset="1"/></LinearGradientBrush></Ellipse.Fill></Ellipse>
+   <TextBlock Text="干" Foreground="White" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" Effect="{x:Null}"/>
+  </Grid>
+ </Grid>
+</Window>

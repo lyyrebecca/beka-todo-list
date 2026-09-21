@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\LiquidTodo.ico</ApplicationIcon>
+    <AssemblyName>LiquidTodo</AssemblyName>
+    <RootNamespace>LiquidTodo.Windows</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PublishSingleFile>false</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LiquidTodo.Core\LiquidTodo.Core.csproj" />
+    <PackageReference Include="CommunityToolkit.WinUI.Notifications" Version="7.1.2" />
+    <Content Include="Assets\LiquidTodo.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\LiquidTodo.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
