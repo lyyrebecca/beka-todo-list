@@ -63,8 +63,8 @@ public sealed class BackupService
         var reminder = ParseEnum(source, "reminderMode", TodoReminderMode.None);
         var minute = source.TryGetProperty("reminderTimeMinutes", out var rawMinute) && rawMinute.TryGetInt32(out var m) ? m : 1260;
         var date = LegacyDate(source, "date");
-        var start = LegacyDate(source, "startDate").HasValue ? DateOnly.FromDateTime(LegacyDate(source, "startDate")!.Value.LocalDateTime) : null;
-        var end = LegacyDate(source, "endDate").HasValue ? DateOnly.FromDateTime(LegacyDate(source, "endDate")!.Value.LocalDateTime) : null;
+        DateOnly? start = LegacyDate(source, "startDate").HasValue ? DateOnly.FromDateTime(LegacyDate(source, "startDate")!.Value.LocalDateTime) : null;
+        DateOnly? end = LegacyDate(source, "endDate").HasValue ? DateOnly.FromDateTime(LegacyDate(source, "endDate")!.Value.LocalDateTime) : null;
         return new TodoSchedule(mode, date, start, end, reminder, minute).Normalize();
     }
 
