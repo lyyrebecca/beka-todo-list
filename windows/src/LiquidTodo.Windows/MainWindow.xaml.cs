@@ -167,7 +167,7 @@ public partial class MainWindow : Window
         BeginAnimation(HeightProperty, new DoubleAnimation(oldH, height, duration) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
     }
 
-    private void Orb_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { _orbStartMouse = PointToScreen(e.GetPosition(this)); _orbStartWindow = new Point(Left, Top); _orbDragging = false; Orb.CaptureMouse(); }
+    private void Orb_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { _orbStartMouse = PointToScreen(e.GetPosition(this)); _orbStartWindow = new System.Windows.Point(Left, Top); _orbDragging = false; Orb.CaptureMouse(); }
     private void Orb_MouseMove(object sender, System.Windows.Input.MouseEventArgs e) { if (!Orb.IsMouseCaptured || e.LeftButton != MouseButtonState.Pressed) return; var now = PointToScreen(e.GetPosition(this)); var dx = now.X - _orbStartMouse.X; var dy = now.Y - _orbStartMouse.Y; if (Math.Abs(dx) + Math.Abs(dy) > 2) _orbDragging = true; Left = _orbStartWindow.X + dx; Top = _orbStartWindow.Y + dy; }
     private void Orb_MouseLeftButtonUp(object sender, MouseButtonEventArgs e) { Orb.ReleaseMouseCapture(); if (_orbDragging) SnapOrb(true); else SetMinimized(false, true); }
     private void SnapOrb(bool animate)
