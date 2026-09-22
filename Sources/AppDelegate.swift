@@ -344,11 +344,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            if let img = NSImage(systemSymbolName: "checklist",
-                                 accessibilityDescription: "液态待办") {
-                img.isTemplate = false
-                button.image = img
-                button.contentTintColor = NSColor(red: 0.66, green: 0.52, blue: 0.98, alpha: 1)
+            if let source = NSImage(systemSymbolName: "checklist",
+                                    accessibilityDescription: "液态待办") {
+                // 菜单栏使用模板图：macOS 会按当前菜单栏/壁纸对比度自动绘制为黑或白。
+                let icon = source.withSymbolConfiguration(
+                    NSImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
+                ) ?? source
+                icon.isTemplate = true
+                button.image = icon
+                button.contentTintColor = nil
             }
             button.toolTip = "贝卡の Todo list 🌟"
         }
