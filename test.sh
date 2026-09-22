@@ -11,7 +11,8 @@ xcrun swiftc -swift-version 5 -target "$(uname -m)-apple-macos14.0" \
 "$BIN"
 
 grep -q 'isMovableByWindowBackground = false' Sources/AppDelegate.swift
-grep -q 'let controlsWidth: CGFloat = 168' Sources/AppDelegate.swift
+grep -q 'headerControlFrames.contains' Sources/AppDelegate.swift
+grep -q 'HeaderControlFrameReporter' Sources/WidgetView.swift
 grep -q 'Button(action: beginEditing)' Sources/WidgetView.swift
 grep -q 'func minimizeWidget()' Sources/AppDelegate.swift
 grep -q 'func restoreWidget()' Sources/AppDelegate.swift

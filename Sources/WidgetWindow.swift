@@ -23,6 +23,25 @@ struct ContentSizeKey: PreferenceKey {
     }
 }
 
+/// SwiftUI 坐标中的标题栏按钮实际点击区域。AppDelegate 只需要 X 轴：
+/// 事件已先限定在标题栏高度内，而 SwiftUI/AppKit 的 X 原点一致。
+struct HeaderControlFramesKey: PreferenceKey {
+    static var defaultValue: [CGRect] = []
+    static func reduce(value: inout [CGRect], nextValue: () -> [CGRect]) {
+        value.append(contentsOf: nextValue())
+    }
+}
+
+struct HeaderControlFrameReporter: View {
+    var body: some View {
+        GeometryReader { proxy in
+            Color.clear.preference(key: HeaderControlFramesKey.self,
+                                   value: [proxy.frame(in: .global)])
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 final class WidgetHostingView: NSHostingView<WidgetView> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

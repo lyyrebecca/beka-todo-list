@@ -16,6 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var hasSized = false
     private var lastSize: CGSize = .zero
     private var isWindowTransitioning = false
+    /// SwiftUI 上报的四个标题栏按钮真实热区；不再以一整段右侧宽度猜测。
+    private var headerControlFrames: [CGRect] = []
 
     /// 微动效使用接近 Apple 系统面板的快速起步、平稳收束曲线；
     /// 在“减少动态效果”开启时直接切换，避免不必要的位移。
@@ -71,6 +73,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let host = WidgetHostingView(rootView: WidgetView(
             store: store,
             onSizeChange: { [weak self] size in self?.setContentSize(size) },
+            onHeaderControlFramesChange: { [weak self] frames in
+                self?.headerControlFrames = frames
+            },
             onMinimize: { [weak self] in self?.minimizeWidget() },
             onRequestTextInput: { [weak self] in self?.activateForTextInput() },
             onTextInputSessionChanged: { [weak self] isActive in
@@ -150,14 +155,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func isDraggableHeaderPoint(_ screenPoint: NSPoint) -> Bool {
         guard let window else { return false }
-        let f = window.frame
+        let localPoint = window.convertPoint(fromScreen: screenPoint)
         let headerHeight: CGFloat = 54
-        // 标题区域可拖动；右侧整组按钮必须交给 SwiftUI 处理。
-        // 旧实现只排除了最右侧 48pt，导致“已完成历史”按钮被窗口拖动监视器吞掉。
-        let controlsWidth: CGFloat = 168
-        let draggableRect = NSRect(x: f.minX, y: f.maxY - headerHeight,
-                                   width: f.width - controlsWidth, height: headerHeight)
-        return draggableRect.contains(screenPoint)
+        let headerRect = NSRect(x: 0, y: window.frame.height - headerHeight,
+                                width: window.frame.width, height: headerHeight)
+        guard headerRect.contains(localPoint) else { return false }
+
+        // 只避让实际按钮，保留按钮之间与右上方留白的窗口拖动能力。
+        // 左右坐标均以窗口内容区为原点，标题栏高度已由 headerRect 限定。
+        return !headerControlFrames.contains { frame in
+            frame.minX <= localPoint.x && localPoint.x <= frame.maxX
+        }
     }
 
     private var desktopLevel: NSWindow.Level {

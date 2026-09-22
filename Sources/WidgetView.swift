@@ -4,6 +4,9 @@ import AppKit
 struct WidgetView: View {
     @ObservedObject var store: TodoStore
     var onSizeChange: (CGSize) -> Void
+    /// 将真实的按钮热区交给 AppKit 的窗口拖动判定。这样右上角的留白仍可拖动，
+    /// 同时不会吞掉 SwiftUI 按钮的点击。
+    var onHeaderControlFramesChange: ([CGRect]) -> Void
     var onMinimize: () -> Void
     var onRequestTextInput: () -> Void
     var onTextInputSessionChanged: (Bool) -> Void
@@ -34,6 +37,7 @@ struct WidgetView: View {
             }
         )
         .onPreferenceChange(ContentSizeKey.self) { onSizeChange($0) }
+        .onPreferenceChange(HeaderControlFramesKey.self) { onHeaderControlFramesChange($0) }
         .sheet(isPresented: $store.isShowingNameSetup) { NameSetupView(store: store) }
         .transition(.opacity.combined(with: .scale(scale: 0.94)))
         // 临界阻尼，避免缩小/恢复时出现“果冻式”二次回弹。
@@ -156,10 +160,10 @@ struct WidgetView: View {
                     .background(Capsule().fill(Theme.rowFill(dark)))
             }
             Spacer()
-            Button {
+            headerControl(action: {
                 store.isShowingArchive.toggle()
                 store.isAdding = false
-            } label: {
+            }) {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: store.isShowingArchive
                           ? "checklist" : "clock.arrow.circlepath")
@@ -174,40 +178,46 @@ struct WidgetView: View {
                 .foregroundStyle(store.isShowingArchive
                                  ? Theme.accent(dark) : Theme.textSecondary(dark))
             }
-            .buttonStyle(.plain)
             .help(store.isShowingArchive ? "返回待办" : "查看已完成")
-            Button { store.isShowingNameSetup = true } label: {
+            headerControl(action: { store.isShowingNameSetup = true }) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Theme.textSecondary(dark))
             }
-            .buttonStyle(.plain)
             .help("自定义待办名称")
-            Button(action: onMinimize) {
+            headerControl(action: onMinimize) {
                 Image(systemName: "minus.circle.fill")
                     .font(.system(size: 18))
                     .foregroundStyle(Theme.textSecondary(dark))
             }
-            .buttonStyle(.plain)
             .help("最小化为屏幕右侧圆圈")
-            Button {
+            headerControl(action: {
                 let willAdd = !store.isAdding
                 if willAdd { onRequestTextInput() }
                 store.isAdding = willAdd
                 store.isShowingArchive = false
                 if willAdd { store.isExpanded = false }
-            } label: {
+            }) {
                 Image(systemName: store.isAdding ? "xmark.circle.fill" : "plus.circle.fill")
                     .font(.system(size: 20))
                     .foregroundStyle(store.isAdding ? Theme.textSecondary(dark) : Theme.accent(dark))
             }
-            .buttonStyle(.plain)
             .keyboardShortcut("n", modifiers: .command)
             .help(store.isAdding ? "关闭添加框" : "添加待办（⌘N）")
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 2)
         .contentShape(Rectangle())
+    }
+
+    /// 统一为四个标题栏按钮留出舒适且可预测的点击热区，并上报每一个实际热区。
+    /// 不上报整组容器，故按钮间与右上方的留白仍然属于窗口拖动区。
+    private func headerControl<Label: View>(action: @escaping () -> Void,
+                                            @ViewBuilder label: () -> Label) -> some View {
+        Button(action: action, label: label)
+            .buttonStyle(.plain)
+            .frame(width: 26, height: 26)
+            .background(HeaderControlFrameReporter())
     }
 
     @ViewBuilder
