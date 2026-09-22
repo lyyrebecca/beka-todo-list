@@ -66,7 +66,7 @@ struct WidgetView: View {
             }
         }
         .padding(15)
-        .frame(width: 350)
+        .frame(width: AppDelegate.widgetWidth)
         .background(Theme.gradientFill(dark),
                     in: RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
         .liquidGlass(tint: Theme.glassTint(dark))
@@ -148,9 +148,17 @@ struct WidgetView: View {
             Image(systemName: "sparkles")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.accent(dark))
-            Text(store.displayName)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(Theme.textPrimary(dark))
+            // 星标单独固定在标题末尾：标题过长时只截断文字，星标绝不换到下一行。
+            HStack(spacing: 3) {
+                Text("\(store.ownerName)の Todo list")
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text("🌟")
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .font(.system(size: 14, weight: .semibold, design: .rounded))
+            .foregroundStyle(Theme.textPrimary(dark))
+            .layoutPriority(1)
             if !store.items.isEmpty {
                 Text("\(store.items.count)")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))

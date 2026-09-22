@@ -6,7 +6,7 @@ import QuartzCore
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
-    static let widgetWidth: CGFloat = 350
+    static let widgetWidth: CGFloat = 390
     static var frameWidth: CGFloat { widgetWidth + 12 }
     static let miniSize: CGFloat = 48
 

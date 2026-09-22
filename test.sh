@@ -13,11 +13,13 @@ xcrun swiftc -swift-version 5 -target "$(uname -m)-apple-macos14.0" \
 grep -q 'isMovableByWindowBackground = false' Sources/AppDelegate.swift
 grep -q 'headerControlFrames.contains' Sources/AppDelegate.swift
 grep -q 'HeaderControlFrameReporter' Sources/WidgetView.swift
+grep -q 'static let widgetWidth: CGFloat = 390' Sources/AppDelegate.swift
+grep -q 'Text("🌟")' Sources/WidgetView.swift
 grep -q 'Button(action: beginEditing)' Sources/WidgetView.swift
 grep -q 'func minimizeWidget()' Sources/AppDelegate.swift
 grep -q 'func restoreWidget()' Sources/AppDelegate.swift
 grep -q 'Text("干")' Sources/WidgetView.swift
-grep -q 'displayName' Sources/WidgetView.swift
+grep -q 'store.ownerName)の Todo list' Sources/WidgetView.swift
 grep -q 'setOwnerName' Sources/TodoStore.swift
 grep -q '从内到外逐步变浅' Sources/WidgetView.swift
 if sed -n '/private var miniWidget/,/private var header/p' Sources/WidgetView.swift | grep -q 'strokeBorder'; then
