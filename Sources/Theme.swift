@@ -15,7 +15,7 @@ enum Theme {
 
     static func textSecondary(_ dark: Bool) -> Color {
         dark ? Color(red: 0.78, green: 0.74, blue: 0.92).opacity(0.75)
-             : Color(red: 0.42, green: 0.38, blue: 0.58).opacity(0.80)
+             : Color(red: 0.34, green: 0.29, blue: 0.52).opacity(0.92)
     }
 
     static func glassTint(_ dark: Bool) -> Color {
@@ -24,8 +24,8 @@ enum Theme {
     }
 
     static func rowFill(_ dark: Bool) -> Color {
-        dark ? Color(red: 0.66, green: 0.55, blue: 1.00).opacity(0.12)
-             : Color(red: 0.55, green: 0.38, blue: 0.95).opacity(0.07)
+        dark ? Color(red: 0.66, green: 0.55, blue: 1.00).opacity(0.18)
+             : Color.white.opacity(0.34)
     }
 
     static func gradientFill(_ dark: Bool) -> LinearGradient {
@@ -33,8 +33,8 @@ enum Theme {
             colors: dark
                 ? [Color(red: 0.36, green: 0.25, blue: 0.64).opacity(0.30),
                    Color(red: 0.17, green: 0.11, blue: 0.33).opacity(0.34)]
-                : [Color.white.opacity(0.26),
-                   Color(red: 0.90, green: 0.85, blue: 1.00).opacity(0.18)],
+                : [Color.white.opacity(0.78),
+                   Color(red: 0.90, green: 0.85, blue: 1.00).opacity(0.62)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -42,7 +42,7 @@ enum Theme {
 
     static func topHighlight(_ dark: Bool) -> LinearGradient {
         LinearGradient(
-            colors: [Color.white.opacity(dark ? 0.20 : 0.50), Color.clear],
+            colors: [Color.white.opacity(dark ? 0.24 : 0.62), Color.clear],
             startPoint: .top,
             endPoint: .bottom
         )
