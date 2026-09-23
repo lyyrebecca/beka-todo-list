@@ -75,7 +75,7 @@ public partial class MainWindow : Window
         {
             var image = new BitmapImage();
             image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.UriSource = new Uri(path); image.EndInit(); image.Freeze();
-            GlassImageLayer.Background = new ImageBrush(image) { Stretch = Stretch.Fill, Opacity = .9 };
+            GlassImageLayer.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill, Opacity = .9 };
         }
         catch { GlassImageLayer.Background = new SolidColorBrush(Color.FromRgb(238, 233, 255)); }
     }

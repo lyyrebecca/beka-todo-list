@@ -26,7 +26,7 @@ internal static class WindowsThemeService
         resources["Purple"] = new SolidColorBrush(ColorFrom(dark ? "FFB3A7FF" : "FF7B68EE"));
         resources["Urgent"] = new SolidColorBrush(ColorFrom(dark ? "FFFF8296" : "FFCD5A70"));
         resources["Important"] = new SolidColorBrush(ColorFrom(dark ? "FFFFD982" : "FFB88618"));
-        resources["GlassTint"] = new SolidColorBrush(ColorFrom(dark ? "C91E1831" : "AFFFFFFF"));
+        resources["GlassTint"] = new SolidColorBrush(ColorFrom(dark ? "A51E1831" : "50FFFFFF"));
         resources["RowFill"] = new SolidColorBrush(ColorFrom(dark ? "664A3D6B" : "88FFFFFF"));
         resources["GlassBorder"] = new SolidColorBrush(ColorFrom(dark ? "55FFFFFF" : "AFFFFFFF"));
         resources["Surface"] = new SolidColorBrush(ColorFrom(dark ? "FF211B32" : "FFFAF8FF"));
