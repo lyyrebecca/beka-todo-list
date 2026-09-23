@@ -27,3 +27,4 @@ windows/**/bin/
 windows/**/obj/
 windows/publish/
 windows/release/
+windows-evidence/
