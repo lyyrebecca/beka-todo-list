@@ -11,6 +11,27 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: 8.0.x }
       - run: dotnet test windows/LiquidTodo.Windows.sln -c Release
-      - run: dotnet publish windows/src/LiquidTodo.Windows/LiquidTodo.Windows.csproj -c Release -r win-x64 --self-contained true -o windows/publish
+      - run: dotnet publish windows/src/LiquidTodo.Windows/LiquidTodo.Windows.csproj -c Release -r win-x64 --self-contained true -p:DebugType=None -p:DebugSymbols=false -o windows/publish
+      - name: Build and verify Portable package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release/portable | Out-Null
+          Copy-Item windows/publish/* release/portable -Recurse -Force
+          New-Item release/portable/portable.flag -ItemType File | Out-Null
+          Copy-Item windows/portable/README-Windows.txt release/portable/README-Windows.txt
+          Copy-Item LICENSE release/portable/LICENSE
+          ./windows/scripts/New-PortableManifest.ps1 -PublishDirectory release/portable -OutputFile release/portable/manifest.json -Version ci
+          Compress-Archive release/portable/* release/LiquidTodo-Windows-x64-Portable-ci.zip
+          ./windows/scripts/Test-PortablePackage.ps1 -PackagePath release/LiquidTodo-Windows-x64-Portable-ci.zip -LaunchSmokeTest -RunUiSmokeTest
+      - name: Render Windows UI evidence
+        shell: pwsh
+        run: |
+          $output = (Resolve-Path release).Path + '\\windows-ui-smoke.png'
+          $process = Start-Process -FilePath (Resolve-Path windows/publish/LiquidTodo.exe) -ArgumentList @('--safe-mode', '--diagnostics', '--demo-screenshot', '--capture-screenshot', $output) -PassThru
+          if (-not $process.WaitForExit(30000)) { Stop-Process -Id $process.Id -Force; throw 'Timed out while rendering Windows UI evidence.' }
+          if ($process.ExitCode -ne 0) { throw "UI evidence process exited with $($process.ExitCode)." }
+          if (-not (Test-Path -LiteralPath $output) -or (Get-Item -LiteralPath $output).Length -lt 1024) { throw 'Windows UI evidence PNG was not produced.' }
       - uses: actions/upload-artifact@v4
-        with: { name: LiquidTodo-Windows-x64-publish, path: windows/publish }
+        with: { name: LiquidTodo-Windows-x64-publish, path: release }
+      - uses: actions/upload-artifact@v4
+        with: { name: LiquidTodo-Windows-ui-smoke, path: release/windows-ui-smoke.png }

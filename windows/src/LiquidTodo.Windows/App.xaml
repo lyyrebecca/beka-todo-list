@@ -5,6 +5,13 @@
   <Application.Resources>
     <SolidColorBrush x:Key="Ink" Color="#29213B"/>
     <SolidColorBrush x:Key="Muted" Color="#786F8A"/>
+    <SolidColorBrush x:Key="SecondaryInk" Color="#625B73"/>
     <SolidColorBrush x:Key="Purple" Color="#7B68EE"/>
+    <SolidColorBrush x:Key="Urgent" Color="#CD5A70"/>
+    <SolidColorBrush x:Key="Important" Color="#B88618"/>
+    <SolidColorBrush x:Key="GlassTint" Color="#50FFFFFF"/>
+    <SolidColorBrush x:Key="RowFill" Color="#88FFFFFF"/>
+    <SolidColorBrush x:Key="GlassBorder" Color="#AFFFFFFF"/>
+    <SolidColorBrush x:Key="Surface" Color="#FFFAF8FF"/>
   </Application.Resources>
 </Application>

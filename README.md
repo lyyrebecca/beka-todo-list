@@ -4,17 +4,18 @@
 
 <p align="center"><strong>离线、本地优先的 Mac / Windows 桌面待办。</strong><br>收起后是可拖动、自动贴边的紫色「干」悬浮球。</p>
 
-<p align="center"><img src="public-assets/screenshots/todo-panel.png" width="520" alt="贝卡の Todo list 主界面"></p>
+<p align="center"><img src="public-assets/screenshots/todo-panel.png" width="49%" alt="macOS 版 Todo list 主界面"> <img src="public-assets/screenshots/windows-todo-panel.png" width="49%" alt="Windows 版 Todo list 主界面"></p>
+<p align="center"><sub>左：macOS · 右：Windows x64；Windows 图由 GitHub Windows runner 实际渲染，使用演示数据</sub></p>
 
 ## 选哪个下载？
 
 | 你的电脑 | 下载文件 | 适合谁 | 打开方式 |
 |---|---|---|---|
-| **Mac（Intel 或 Apple 芯片）** | `LiquidTodo-macOS-universal-v2.0.0.zip` | 所有 Mac 用户 | 解压后把 `LiquidTodo.app` 拖进“应用程序”，双击打开。 |
-| **Windows 10 22H2 / Windows 11 x64** | `LiquidTodo-Windows-x64-Setup-v2.0.0.exe` | 推荐，大多数 Windows 用户 | 双击安装器，按提示安装；可选桌面快捷方式与开机启动。 |
-| **Windows 10 22H2 / Windows 11 x64** | `LiquidTodo-Windows-x64-Portable-v2.0.0.zip` | 不想安装、想放 U 盘 | 解压整个文件夹，双击 `LiquidTodo.exe`；不要移动或删除同级 `Data/`。 |
+| **Mac（Intel 或 Apple 芯片）** | `LiquidTodo-macOS-universal-v2.0.1.zip` | 所有 Mac 用户 | 解压后把 `LiquidTodo.app` 拖进“应用程序”，双击打开。 |
+| **Windows 10 22H2 / Windows 11 x64** | `LiquidTodo-Windows-x64-Setup-v2.0.1.exe` | 推荐，大多数 Windows 用户 | 双击安装器，按提示安装；可选桌面快捷方式与开机启动。 |
+| **Windows 10 22H2 / Windows 11 x64** | `LiquidTodo-Windows-x64-Portable-v2.0.1.zip` | 不想安装、想放 U 盘 | 解压整个文件夹，双击 `LiquidTodo.exe`；首次启动会在同级创建 `Data/`，之后不要删除它。 |
 
-> **Windows 首版无需安装 .NET。** 若 SmartScreen 显示“未知发布者”，点击 **更多信息 → 仍要运行**；这是因为首版尚未使用 Authenticode 证书。只从 [Releases](../../releases/latest) 下载，并用 `SHA256SUMS.txt` 核对文件。
+> **Windows 版无需安装 .NET。** 若 SmartScreen 显示“未知发布者”，点击 **更多信息 → 仍要运行**；这是因为目前尚未使用 Authenticode 证书。只从 [Releases](../../releases/latest) 下载，并用 `SHA256SUMS.txt` 核对文件。
 
 ## 三步开始使用
 
@@ -51,6 +52,8 @@
 
 备份格式为 [LiquidTodo Backup v1](shared/backup-schema/liquidtodo-backup-v1.schema.json)，可在 Mac 和 Windows 间手动迁移。
 
+常规用户请从 [GitHub Releases](../../releases/latest) 选择上表对应的安装包。GitHub Packages 中的 `ghcr.io/lyyrebecca/beka-todo-list` 是下载文件镜像，包含 macOS ZIP、Windows Setup EXE、Windows Portable ZIP 和 SHA-256 清单，供偏好容器仓库的用户下载；不需要 Docker 的用户无需使用它。
+
 ## 开发与验证
 
 ```bash
@@ -63,5 +66,17 @@ dotnet publish windows/src/LiquidTodo.Windows -c Release -r win-x64 --self-conta
 ```
 
 Windows CI 会跑单元测试并构建自包含发布产物；最新通过记录见 [Actions](../../actions)。
+
+### Windows Portable 无法启动？
+
+请确认先**完整解压 ZIP**，而不是在压缩包预览中直接双击，也不要只拷走 `LiquidTodo.exe`。Portable 版本必须与同目录的 DLL、`LiquidTodo.runtimeconfig.json`、资源文件一起运行。
+
+若双击后进程仍立即退出，请运行：
+
+```powershell
+.\LiquidTodo.exe --safe-mode --diagnostics
+```
+
+它会跳过托盘、通知和桌面展示模式，只打开基础待办面板；启动错误会写入同级 `Data\Logs\startup-*.log`。请附上该日志与 Windows 版本信息提交 Issue。每个 Release 都包含 `manifest.json`（包内逐文件 SHA-256）及总文件 `SHA256SUMS.txt`，可用于确认下载完整性。
 
 [MIT](LICENSE)

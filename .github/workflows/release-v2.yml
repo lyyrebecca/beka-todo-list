@@ -2,7 +2,7 @@ name: Build release assets
 on:
   workflow_dispatch:
     inputs:
-      version: { description: Release version, required: true, default: v2.0.0 }
+      version: { description: Release version, required: true, default: v2.0.1 }
       publish: { description: Publish after review, required: true, type: boolean, default: false }
 permissions: { contents: write }
 jobs:
@@ -13,17 +13,45 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: 8.0.x }
       - run: dotnet test windows/LiquidTodo.Windows.sln -c Release
-      - run: dotnet publish windows/src/LiquidTodo.Windows/LiquidTodo.Windows.csproj -c Release -r win-x64 --self-contained true -o windows/publish
-      - run: choco install innosetup --no-progress -y; iscc windows/installer/LiquidTodo.iss
-      - run: New-Item -ItemType Directory release/portable; Copy-Item windows/publish/* release/portable -Recurse; New-Item release/portable/portable.flag -ItemType File; Compress-Archive release/portable/* release/LiquidTodo-Windows-x64-Portable-v2.0.0.zip
+      - run: dotnet publish windows/src/LiquidTodo.Windows/LiquidTodo.Windows.csproj -c Release -r win-x64 --self-contained true -p:DebugType=None -p:DebugSymbols=false -o windows/publish
+      - name: Build Setup and Portable package
+        shell: pwsh
+        run: |
+          $version = '${{ inputs.version }}'.TrimStart('v')
+          choco install innosetup --no-progress -y
+          iscc "/DMyAppVersion=$version" windows/installer/LiquidTodo.iss
+          New-Item -ItemType Directory -Force release/portable | Out-Null
+          Copy-Item windows/publish/* release/portable -Recurse -Force
+          New-Item release/portable/portable.flag -ItemType File | Out-Null
+          Copy-Item windows/portable/README-Windows.txt release/portable/README-Windows.txt
+          Copy-Item LICENSE release/portable/LICENSE
+          ./windows/scripts/New-PortableManifest.ps1 -PublishDirectory release/portable -OutputFile release/portable/manifest.json -Version $version
+          $portable = "release/LiquidTodo-Windows-x64-Portable-v$version.zip"
+          Compress-Archive release/portable/* $portable
+          ./windows/scripts/Test-PortablePackage.ps1 -PackagePath $portable -LaunchSmokeTest -RunUiSmokeTest
+          ./windows/scripts/Test-InstallerPackage.ps1 -InstallerPath "release/LiquidTodo-Windows-x64-Setup-v$version.exe"
       - uses: actions/upload-artifact@v4
         with: { name: windows-release, path: release }
   macos:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - run: ./test.sh && ./build.sh && codesign --verify --deep --strict LiquidTodo.app
-      - run: mkdir release && ditto -c -k --sequesterRsrc --keepParent LiquidTodo.app release/LiquidTodo-macOS-universal-v2.0.0.zip && shasum -a 256 release/* > release/SHA256SUMS.txt
+      - name: Set macOS release version and verify app
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="${VERSION#v}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" Info.plist
+          ./test.sh && ./build.sh && codesign --verify --deep --strict LiquidTodo.app
+      - name: Package universal macOS app
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="${VERSION#v}"
+          mkdir release
+          ditto -c -k --sequesterRsrc --keepParent LiquidTodo.app "release/LiquidTodo-macOS-universal-v${VERSION}.zip"
+          (cd release && shasum -a 256 LiquidTodo-* > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with: { name: macos-release, path: release }
   release:
@@ -43,4 +71,16 @@ jobs:
         with:
           tag_name: ${{ inputs.version }}
           draft: true
+          body: |
+            v2.0.1 修复了 Windows 便携版启动诊断与打包校验，并强化了液态玻璃界面纹理和待办时间编辑。
+
+            ## 选择对应系统的下载文件
+
+            | 系统 | 下载文件 | 安装 / 使用 |
+            |---|---|---|
+            | macOS Intel / Apple 芯片 | `LiquidTodo-macOS-universal-${{ inputs.version }}.zip` | 解压后将 `LiquidTodo.app` 拖入“应用程序”并打开。 |
+            | Windows 10 22H2 / Windows 11 x64（推荐） | `LiquidTodo-Windows-x64-Setup-${{ inputs.version }}.exe` | 双击安装，可选桌面快捷方式和登录启动。 |
+            | Windows 10 22H2 / Windows 11 x64（免安装） | `LiquidTodo-Windows-x64-Portable-${{ inputs.version }}.zip` | 解压整个文件夹，运行 `LiquidTodo.exe`；数据保存在同级 `Data/`。 |
+
+            Windows 安装包没有 Authenticode 签名，SmartScreen 若提示未知发布者，选择“更多信息 → 仍要运行”。请先用 `SHA256SUMS.txt` 校验下载完整性。
           files: assets/*

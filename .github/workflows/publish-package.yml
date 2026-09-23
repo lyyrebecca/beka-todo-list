@@ -1,4 +1,4 @@
-name: Publish macOS package
+name: Publish cross-platform package mirror
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
       version:
         description: Release tag to mirror into GitHub Packages
         required: true
-        default: v2.0.0
+        default: v2.0.1
 
 permissions:
   contents: read
@@ -20,7 +20,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download "${{ inputs.version }}" --repo "${{ github.repository }}" --pattern 'LiquidTodo-*.zip'
+          gh release download "${{ inputs.version }}" --repo "${{ github.repository }}" --pattern 'LiquidTodo-*'
           gh release download "${{ inputs.version }}" --repo "${{ github.repository }}" --pattern 'SHA256SUMS.txt'
 
       - name: Log in to GitHub Container Registry
@@ -38,9 +38,9 @@ jobs:
           cat > Dockerfile.package <<'DOCKERFILE'
           FROM scratch
           LABEL org.opencontainers.image.title="贝卡の Todo list"
-          LABEL org.opencontainers.image.description="Cross-platform LiquidTodo download package mirror"
+          LABEL org.opencontainers.image.description="Cross-platform LiquidTodo download package mirror including macOS, Windows Setup and Portable downloads"
           LABEL org.opencontainers.image.source="https://github.com/lyyrebecca/beka-todo-list"
-          COPY LiquidTodo-*.zip SHA256SUMS.txt /downloads/
+          COPY LiquidTodo-* SHA256SUMS.txt /downloads/
           DOCKERFILE
           docker buildx build --platform linux/amd64 --push \
             --tag "$IMAGE:$VERSION" --tag "$IMAGE:latest" -f Dockerfile.package .
