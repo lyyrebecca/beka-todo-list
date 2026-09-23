@@ -184,6 +184,7 @@ public partial class MainWindow : Window
         var label = new TextBlock { Text = LabelFor(item), Foreground = IsOverdue(item) ? (Brush)FindResource("Urgent") : (Brush)FindResource("Purple"), FontSize = 10, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Right, TextTrimming = TextTrimming.CharacterEllipsis };
         Grid.SetColumn(label, 3); grid.Children.Add(label);
         var edit = new Button { Content = "✎", Width = 22, Height = 24, Padding = new Thickness(0), BorderThickness = new Thickness(0), Background = Brushes.Transparent, Foreground = (Brush)FindResource("Muted"), ToolTip = "编辑待办" };
+        System.Windows.Automation.AutomationProperties.SetName(edit, "编辑待办");
         edit.Click += (_, _) => Edit(item); Grid.SetColumn(edit, 4); grid.Children.Add(edit);
         var handle = new Thumb { Width = 18, Height = 28, Cursor = Cursors.SizeAll, ToolTip = "拖动调整顺序", Opacity = .65, Template = CreateHandleTemplate() };
         handle.DragStarted += (_, _) => row.Opacity = .72;

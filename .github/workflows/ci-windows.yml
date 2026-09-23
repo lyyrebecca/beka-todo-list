@@ -22,7 +22,7 @@ jobs:
           Copy-Item LICENSE release/portable/LICENSE
           ./windows/scripts/New-PortableManifest.ps1 -PublishDirectory release/portable -OutputFile release/portable/manifest.json -Version ci
           Compress-Archive release/portable/* release/LiquidTodo-Windows-x64-Portable-ci.zip
-          ./windows/scripts/Test-PortablePackage.ps1 -PackagePath release/LiquidTodo-Windows-x64-Portable-ci.zip -LaunchSmokeTest
+          ./windows/scripts/Test-PortablePackage.ps1 -PackagePath release/LiquidTodo-Windows-x64-Portable-ci.zip -LaunchSmokeTest -RunUiSmokeTest
       - name: Render Windows UI evidence
         shell: pwsh
         run: |

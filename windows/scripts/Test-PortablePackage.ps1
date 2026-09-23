@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$PackagePath,
-    [switch]$LaunchSmokeTest
+    [switch]$LaunchSmokeTest,
+    [switch]$RunUiSmokeTest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,6 +44,15 @@ try {
         finally {
             if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
         }
+    }
+
+    if ($RunUiSmokeTest) {
+        $uiScript = Join-Path $PSScriptRoot 'Test-WindowsUiSmoke.ps1'
+        $uiExecutable = Join-Path $root 'LiquidTodo.exe'
+        $powershell = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $uiArguments = @('-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $uiScript + '"'), '-ExecutablePath', ('"' + $uiExecutable + '"'))
+        $uiTest = Start-Process -FilePath $powershell -ArgumentList $uiArguments -Wait -PassThru -NoNewWindow
+        if ($uiTest.ExitCode -ne 0) { throw "Windows UI smoke test exited with code $($uiTest.ExitCode)." }
     }
 
     Write-Host "Portable package verification passed: $package"

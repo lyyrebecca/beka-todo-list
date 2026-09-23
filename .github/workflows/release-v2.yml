@@ -28,7 +28,7 @@ jobs:
           ./windows/scripts/New-PortableManifest.ps1 -PublishDirectory release/portable -OutputFile release/portable/manifest.json -Version $version
           $portable = "release/LiquidTodo-Windows-x64-Portable-v$version.zip"
           Compress-Archive release/portable/* $portable
-          ./windows/scripts/Test-PortablePackage.ps1 -PackagePath $portable -LaunchSmokeTest
+          ./windows/scripts/Test-PortablePackage.ps1 -PackagePath $portable -LaunchSmokeTest -RunUiSmokeTest
           ./windows/scripts/Test-InstallerPackage.ps1 -InstallerPath "release/LiquidTodo-Windows-x64-Setup-v$version.exe"
       - uses: actions/upload-artifact@v4
         with: { name: windows-release, path: release }
