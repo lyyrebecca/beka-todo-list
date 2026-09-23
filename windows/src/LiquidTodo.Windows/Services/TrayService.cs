@@ -9,7 +9,13 @@ internal sealed class TrayService : IDisposable
     public TrayService(string iconFile, Action showHide, Action add, Action desktop, Func<bool> desktopEnabled,
         Action startup, Func<bool> startupEnabled, Action import, Action export, Action clearArchived, Action exit)
     {
-        _icon = new Forms.NotifyIcon { Text = "贝卡の Todo list", Visible = true, Icon = new Icon(iconFile) };
+        // A missing icon must never make a WinExe vanish before its first window.
+        // The package validator still treats the custom icon as required; this only
+        // makes a damaged/manual install diagnosable from the visible application.
+        Icon icon;
+        try { icon = File.Exists(iconFile) ? new Icon(iconFile) : (Icon)SystemIcons.Application.Clone(); }
+        catch { icon = (Icon)SystemIcons.Application.Clone(); }
+        _icon = new Forms.NotifyIcon { Text = "贝卡の Todo list", Visible = true, Icon = icon };
         var menu = new Forms.ContextMenuStrip();
         menu.Opening += (_, _) =>
         {

@@ -16,7 +16,9 @@
   <ItemGroup>
     <ProjectReference Include="..\LiquidTodo.Core\LiquidTodo.Core.csproj" />
     <PackageReference Include="CommunityToolkit.WinUI.Notifications" Version="7.1.2" />
-    <Content Include="Assets\LiquidTodo.png" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Assets\LiquidTodo.ico" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The tray icon is loaded from disk at startup.  Copy it explicitly when
+         publishing too: CopyToOutputDirectory alone is not a packaging contract. -->
+    <Content Include="Assets\LiquidTodo.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
+    <Content Include="Assets\LiquidTodo.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
   </ItemGroup>
 </Project>

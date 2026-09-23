@@ -1,5 +1,9 @@
-#define MyAppName "贝卡の Todo list"
-#define MyAppVersion "2.0.0"
+#ifndef MyAppName
+  #define MyAppName "贝卡の Todo list"
+#endif
+#ifndef MyAppVersion
+  #define MyAppVersion "2.0.0"
+#endif
 #define MyAppPublisher "lyyrebecca"
 #define MyAppExeName "LiquidTodo.exe"
 [Setup]
@@ -10,7 +14,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={localappdata}\Programs\LiquidTodo
 DefaultGroupName={#MyAppName}
 OutputDir=..\..\release
-OutputBaseFilename=LiquidTodo-Windows-x64-Setup-v2.0.0
+OutputBaseFilename=LiquidTodo-Windows-x64-Setup-v{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=lowest

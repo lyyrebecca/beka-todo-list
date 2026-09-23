@@ -14,8 +14,21 @@ jobs:
         with: { dotnet-version: 8.0.x }
       - run: dotnet test windows/LiquidTodo.Windows.sln -c Release
       - run: dotnet publish windows/src/LiquidTodo.Windows/LiquidTodo.Windows.csproj -c Release -r win-x64 --self-contained true -o windows/publish
-      - run: choco install innosetup --no-progress -y; iscc windows/installer/LiquidTodo.iss
-      - run: New-Item -ItemType Directory release/portable; Copy-Item windows/publish/* release/portable -Recurse; New-Item release/portable/portable.flag -ItemType File; Compress-Archive release/portable/* release/LiquidTodo-Windows-x64-Portable-v2.0.0.zip
+      - name: Build Setup and Portable package
+        shell: pwsh
+        run: |
+          $version = '${{ inputs.version }}'.TrimStart('v')
+          choco install innosetup --no-progress -y
+          iscc "/DMyAppVersion=$version" windows/installer/LiquidTodo.iss
+          New-Item -ItemType Directory -Force release/portable | Out-Null
+          Copy-Item windows/publish/* release/portable -Recurse -Force
+          New-Item release/portable/portable.flag -ItemType File | Out-Null
+          Copy-Item windows/portable/README-Windows.txt release/portable/README-Windows.txt
+          Copy-Item LICENSE release/portable/LICENSE
+          ./windows/scripts/New-PortableManifest.ps1 -PublishDirectory release/portable -OutputFile release/portable/manifest.json -Version $version
+          $portable = "release/LiquidTodo-Windows-x64-Portable-v$version.zip"
+          Compress-Archive release/portable/* $portable
+          ./windows/scripts/Test-PortablePackage.ps1 -PackagePath $portable -LaunchSmokeTest
       - uses: actions/upload-artifact@v4
         with: { name: windows-release, path: release }
   macos:

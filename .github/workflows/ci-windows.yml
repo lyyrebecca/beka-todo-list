@@ -12,5 +12,16 @@ jobs:
         with: { dotnet-version: 8.0.x }
       - run: dotnet test windows/LiquidTodo.Windows.sln -c Release
       - run: dotnet publish windows/src/LiquidTodo.Windows/LiquidTodo.Windows.csproj -c Release -r win-x64 --self-contained true -o windows/publish
+      - name: Build and verify Portable package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release/portable | Out-Null
+          Copy-Item windows/publish/* release/portable -Recurse -Force
+          New-Item release/portable/portable.flag -ItemType File | Out-Null
+          Copy-Item windows/portable/README-Windows.txt release/portable/README-Windows.txt
+          Copy-Item LICENSE release/portable/LICENSE
+          ./windows/scripts/New-PortableManifest.ps1 -PublishDirectory release/portable -OutputFile release/portable/manifest.json -Version ci
+          Compress-Archive release/portable/* release/LiquidTodo-Windows-x64-Portable-ci.zip
+          ./windows/scripts/Test-PortablePackage.ps1 -PackagePath release/LiquidTodo-Windows-x64-Portable-ci.zip -LaunchSmokeTest
       - uses: actions/upload-artifact@v4
-        with: { name: LiquidTodo-Windows-x64-publish, path: windows/publish }
+        with: { name: LiquidTodo-Windows-x64-publish, path: release }

@@ -20,38 +20,51 @@ public partial class MainWindow : Window
     private readonly SettingsService _settingsService;
     private AppSettings _settings;
     private readonly StartupService _startup = new();
-    private readonly TrayService _tray;
-    private readonly ToastNotificationService _toasts;
+    private readonly TrayService? _tray;
+    private readonly ToastNotificationService? _toasts;
+    private readonly bool _safeMode;
     private readonly Dictionary<Guid, System.Windows.Threading.DispatcherTimer> _undoTimers = [];
     private System.Windows.Point _orbStartMouse, _orbStartWindow;
     private bool _orbDragging;
     private bool _ready;
 
-    public MainWindow(LiquidTodoPaths paths, TodoStore store, string[] arguments)
+    public MainWindow(LiquidTodoPaths paths, TodoStore store, string[] arguments, bool safeMode = false)
     {
         InitializeComponent();
-        _paths = paths; _store = store; _settingsService = new SettingsService(paths.SettingsFile); _settings = _settingsService.Load();
-        _tray = new TrayService(Path.Combine(AppContext.BaseDirectory, "LiquidTodo.ico"), ToggleVisible, StartAdd, ToggleDesktopMode, () => _settings.DesktopMode, ToggleStartup, () => _startup.IsEnabled, ImportBackup, ExportBackup, ClearArchived, () => System.Windows.Application.Current.Shutdown());
-        _toasts = new ToastNotificationService(_tray.Balloon);
+        _paths = paths; _store = store; _safeMode = safeMode; _settingsService = new SettingsService(paths.SettingsFile); _settings = _settingsService.Load();
+        if (!safeMode)
+        {
+            // Publish preserves the Assets directory.  Looking beside the EXE was
+            // the direct cause of the released Portable build exiting on startup.
+            _tray = new TrayService(Path.Combine(AppContext.BaseDirectory, "Assets", "LiquidTodo.ico"), ToggleVisible, StartAdd, ToggleDesktopMode, () => _settings.DesktopMode, ToggleStartup, () => _startup.IsEnabled, ImportBackup, ExportBackup, ClearArchived, () => System.Windows.Application.Current.Shutdown());
+            _toasts = new ToastNotificationService(_tray.Balloon);
+        }
+        else
+        {
+            ShowInTaskbar = true;
+            SafeExitButton.Visibility = Visibility.Visible;
+            MinimizeButton.Visibility = Visibility.Collapsed;
+            DesktopButton.Visibility = Visibility.Collapsed;
+        }
         _store.Changed += (_, _) => Dispatcher.Invoke(Render);
         Loaded += (_, _) =>
         {
             ApplyInitialPosition();
-            EnsureOwnerName();
-            if (_settings.IsMinimized) SetMinimized(true, false); else Render();
-            ApplyDesktopMode();
-            if (_store.RecoveryMessage is { } message) _tray.Balloon("数据已恢复", message);
+            if (!safeMode) EnsureOwnerName();
+            if (!safeMode && _settings.IsMinimized) SetMinimized(true, false); else Render();
+            if (!safeMode) ApplyDesktopMode();
+            if (_store.RecoveryMessage is { } message) _tray?.Balloon("数据已恢复", message);
             if (TryReadImport(arguments, out var import)) ImportBackup(import);
             _ready = true;
         };
-        Closed += (_, _) => { _toasts.Dispose(); _tray.Dispose(); foreach (var timer in _undoTimers.Values) timer.Stop(); };
+        Closed += (_, _) => { _toasts?.Dispose(); _tray?.Dispose(); foreach (var timer in _undoTimers.Values) timer.Stop(); };
     }
 
     public void ActivateFromSecondLaunch(string command)
     {
         if (_settings.IsMinimized) SetMinimized(false, true);
         Show(); WindowState = WindowState.Normal; Topmost = !_settings.DesktopMode; Activate(); Focus();
-        if (command == "import") _tray.Balloon("贝卡の Todo list", "已有实例已唤醒；请从托盘菜单选择导入备份。");
+        if (command == "import") _tray?.Balloon("贝卡の Todo list", "已有实例已唤醒；请从托盘菜单选择导入备份。");
     }
 
     private static bool TryReadImport(IEnumerable<string> args, out string file)
@@ -69,7 +82,7 @@ public partial class MainWindow : Window
 
     private void Render()
     {
-        if (_settings.IsMinimized) return;
+        if (_settings.IsMinimized && !_safeMode) return;
         ItemsHost.Children.Clear();
         var showArchive = ArchiveButton.Tag as string == "archive";
         var source = showArchive ? _store.Archived : _store.Items;
@@ -81,7 +94,7 @@ public partial class MainWindow : Window
         if (!showArchive && _store.Items.Count > 10) ItemsHost.Children.Add(new TextBlock { Text = $"还有 {_store.Items.Count - 10} 项，向下滚动查看", Foreground = Brushes.Gray, Margin = new Thickness(4, 8, 4, 0), FontSize = 11 });
         AddButton.Visibility = showArchive ? Visibility.Collapsed : Visibility.Visible;
         AnimateTo(PanelWidth, Math.Max(190, Math.Min(640, 150 + Math.Min(10, source.Count) * 52 + (showArchive ? 28 : 42))), false);
-        _toasts.Rebuild(_store.UpcomingReminders(DateTimeOffset.Now));
+        _toasts?.Rebuild(_store.UpcomingReminders(DateTimeOffset.Now));
     }
 
     private Border CreateTodoRow(TodoItem item)
@@ -130,7 +143,7 @@ public partial class MainWindow : Window
         var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
         timer.Tick += (_, _) => { timer.Stop(); _undoTimers.Remove(id); _store.ArchiveCompleted(id); };
         _undoTimers[id] = timer; timer.Start();
-        _tray.Balloon("已完成", "4 秒内点击待办区域的“撤销”可恢复。");
+        _tray?.Balloon("已完成", "4 秒内点击待办区域的“撤销”可恢复。");
         AddUndoRow(id);
     }
     private void AddUndoRow(Guid id)
@@ -150,6 +163,7 @@ public partial class MainWindow : Window
     private void CustomizeOwnerName() { var dialog = new NameSetupWindow(OwnerName) { Owner = this }; if (dialog.ShowDialog() == true) { var owner = string.IsNullOrWhiteSpace(dialog.OwnerName) ? "贝卡" : dialog.OwnerName[..Math.Min(20, dialog.OwnerName.Length)]; _settings = _settings with { OwnerName = owner }; _settingsService.Save(_settings); Render(); } }
 
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { if (e.LeftButton == MouseButtonState.Pressed) DragMove(); }
+    private void SafeExitButton_Click(object sender, RoutedEventArgs e) => System.Windows.Application.Current.Shutdown();
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SetMinimized(true, true);
     private void SetMinimized(bool minimized, bool animate)
     {
@@ -181,14 +195,14 @@ public partial class MainWindow : Window
 
     private void DesktopButton_Click(object sender, RoutedEventArgs e) => ToggleDesktopMode();
     private void ToggleDesktopMode() { _settings = _settings with { DesktopMode = !_settings.DesktopMode }; _settingsService.Save(_settings); ApplyDesktopMode(); }
-    private void ApplyDesktopMode() { DesktopModeService.Apply(this, _settings.DesktopMode); _tray.Balloon("贝卡の Todo list", _settings.DesktopMode ? "已沉入桌面：纯展示，鼠标会穿透。" : "已恢复可交互模式。"); }
-    private void ToggleStartup() { _startup.SetEnabled(!_startup.IsEnabled); _tray.Balloon("贝卡の Todo list", _startup.IsEnabled ? "已设为开机自动启动。" : "已关闭开机自动启动。"); }
+    private void ApplyDesktopMode() { if (_safeMode) return; DesktopModeService.Apply(this, _settings.DesktopMode); _tray?.Balloon("贝卡の Todo list", _settings.DesktopMode ? "已沉入桌面：纯展示，鼠标会穿透。" : "已恢复可交互模式。"); }
+    private void ToggleStartup() { _startup.SetEnabled(!_startup.IsEnabled); _tray?.Balloon("贝卡の Todo list", _startup.IsEnabled ? "已设为开机自动启动。" : "已关闭开机自动启动。"); }
     private void ToggleVisible() { if (!IsVisible) { Show(); ActivateFromSecondLaunch("activate"); } else Hide(); }
-    private void ExportBackup() { var dialog = new Microsoft.Win32.SaveFileDialog { Filter = "LiquidTodo Backup|*.json", FileName = $"LiquidTodo-Backup-{DateTime.Now:yyyyMMdd-HHmmss}.json" }; if (dialog.ShowDialog(this) == true) { _store.Export(dialog.FileName); _tray.Balloon("导出完成", Path.GetFileName(dialog.FileName)); } }
+    private void ExportBackup() { var dialog = new Microsoft.Win32.SaveFileDialog { Filter = "LiquidTodo Backup|*.json", FileName = $"LiquidTodo-Backup-{DateTime.Now:yyyyMMdd-HHmmss}.json" }; if (dialog.ShowDialog(this) == true) { _store.Export(dialog.FileName); _tray?.Balloon("导出完成", Path.GetFileName(dialog.FileName)); } }
     private void ImportBackup() { var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "LiquidTodo Backup 或旧版数据|*.json" }; if (dialog.ShowDialog(this) == true) ImportBackup(dialog.FileName); }
     private void ImportBackup(string file)
     {
-        try { var replace = MessageBox.Show(this, "默认会安全合并并按 UUID 去重。选择“是”可替换本机全部待办（导入前仍会自动备份）。", "导入备份", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes; var result = _store.Import(file, replace ? ImportMode.Replace : ImportMode.Merge); _tray.Balloon("导入完成", $"新增 {result.ImportedItems + result.ImportedArchived} 项，跳过 {result.SkippedDuplicates} 项。已自动备份。"); } catch (Exception ex) { MessageBox.Show(this, $"无法导入备份：{ex.Message}", "贝卡の Todo list", MessageBoxButton.OK, MessageBoxImage.Error); }
+        try { var replace = MessageBox.Show(this, "默认会安全合并并按 UUID 去重。选择“是”可替换本机全部待办（导入前仍会自动备份）。", "导入备份", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes; var result = _store.Import(file, replace ? ImportMode.Replace : ImportMode.Merge); _tray?.Balloon("导入完成", $"新增 {result.ImportedItems + result.ImportedArchived} 项，跳过 {result.SkippedDuplicates} 项。已自动备份。"); } catch (Exception ex) { MessageBox.Show(this, $"无法导入备份：{ex.Message}", "贝卡の Todo list", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
     private void SavePosition() { _settings = _settings with { Left = Left, Top = Top }; _settingsService.Save(_settings); }
     protected override void OnLocationChanged(EventArgs e) { base.OnLocationChanged(e); if (_ready) SavePosition(); }

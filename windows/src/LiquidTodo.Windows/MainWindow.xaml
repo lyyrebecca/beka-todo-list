@@ -11,13 +11,14 @@
    <Grid>
     <Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="*"/><RowDefinition Height="42"/></Grid.RowDefinitions>
     <Grid Grid.Row="0" MouseLeftButtonDown="Header_MouseLeftButtonDown">
-     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="132"/></Grid.ColumnDefinitions>
+     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="160"/></Grid.ColumnDefinitions>
      <StackPanel><TextBlock x:Name="NameTitle" Text="贝卡の Todo list" FontSize="17" FontWeight="SemiBold" Foreground="#29213B"/><TextBlock x:Name="SubTitle" Text="今天，把一件事做好" FontSize="11" Foreground="#786F8A" Margin="0,2,0,0"/></StackPanel>
      <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
       <Button x:Name="ArchiveButton" Style="{StaticResource HeaderButton}" ToolTip="完成历史" Click="ArchiveButton_Click" Content="◷"/>
       <Button Style="{StaticResource HeaderButton}" ToolTip="自定义待办名称" Click="CustomizeNameButton_Click" Content="⚙"/>
-      <Button Style="{StaticResource HeaderButton}" ToolTip="沉入桌面" Click="DesktopButton_Click" Content="⌁"/>
-      <Button Style="{StaticResource HeaderButton}" ToolTip="收起为悬浮球" Click="MinimizeButton_Click" Content="−"/>
+      <Button x:Name="DesktopButton" Style="{StaticResource HeaderButton}" ToolTip="沉入桌面" Click="DesktopButton_Click" Content="⌁"/>
+      <Button x:Name="MinimizeButton" Style="{StaticResource HeaderButton}" ToolTip="收起为悬浮球" Click="MinimizeButton_Click" Content="−"/>
+      <Button x:Name="SafeExitButton" Visibility="Collapsed" Style="{StaticResource HeaderButton}" ToolTip="退出" Click="SafeExitButton_Click" Content="×"/>
      </StackPanel>
     </Grid>
     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8,0,8"><StackPanel x:Name="ItemsHost"/></ScrollViewer>
