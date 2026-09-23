@@ -24,7 +24,13 @@ function Wait-Window([string]$name, [int]$timeoutSeconds = 15) {
         if ($window) { return $window }
         Start-Sleep -Milliseconds 250
     } while ($timer.Elapsed.TotalSeconds -lt $timeoutSeconds)
-    throw "Timed out waiting for window '$name'."
+    $openWindows = @()
+    $topLevel = $script:root.FindAll($script:children, $script:all)
+    for ($i = 0; $i -lt $topLevel.Count; $i++) {
+        try { $openWindows += $topLevel.Item($i).Current.Name }
+        catch { }
+    }
+    throw "Timed out waiting for window '$name'. Open top-level UIA windows: $($openWindows -join ' | ')"
 }
 
 function Find-ElementById($window, [string]$automationId) {
@@ -93,6 +99,14 @@ function Wait-Text($window, [string]$value, [bool]$shouldExist = $true, [int]$ti
 try {
     # This runs only against a fresh temporary extraction of the Portable package.
     $process = Start-Process -FilePath $exe -ArgumentList @('--portable', '--diagnostics') -PassThru
+    Start-Sleep -Seconds 1
+    $process.Refresh()
+    if ($process.HasExited) {
+        $logRoot = Join-Path (Split-Path $exe) 'Data\Logs'
+        $logs = Get-ChildItem -LiteralPath $logRoot -Filter 'startup-*.log' -ErrorAction SilentlyContinue |
+            ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }
+        throw "Application exited before the first-run window appeared. $($logs -join "`n")"
+    }
 
     $welcome = Wait-Window '欢迎使用'
     Set-Text (Wait-ElementById $welcome 'OwnerNameInput') 'Windows验收'

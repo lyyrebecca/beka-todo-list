@@ -30,6 +30,15 @@ try {
         if ($actual -ne $file.sha256) { throw "Manifest checksum mismatch: $($file.path)" }
     }
 
+    if ($RunUiSmokeTest) {
+        $uiScript = Join-Path $PSScriptRoot 'Test-WindowsUiSmoke.ps1'
+        $uiExecutable = Join-Path $root 'LiquidTodo.exe'
+        $powershell = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $uiArguments = @('-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $uiScript + '"'), '-ExecutablePath', ('"' + $uiExecutable + '"'))
+        $uiTest = Start-Process -FilePath $powershell -ArgumentList $uiArguments -Wait -PassThru -NoNewWindow
+        if ($uiTest.ExitCode -ne 0) { throw "Windows UI smoke test exited with code $($uiTest.ExitCode)." }
+    }
+
     if ($LaunchSmokeTest) {
         $process = Start-Process -FilePath (Join-Path $root 'LiquidTodo.exe') -ArgumentList @('--safe-mode', '--diagnostics') -PassThru
         try {
@@ -44,15 +53,6 @@ try {
         finally {
             if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
         }
-    }
-
-    if ($RunUiSmokeTest) {
-        $uiScript = Join-Path $PSScriptRoot 'Test-WindowsUiSmoke.ps1'
-        $uiExecutable = Join-Path $root 'LiquidTodo.exe'
-        $powershell = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-        $uiArguments = @('-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $uiScript + '"'), '-ExecutablePath', ('"' + $uiExecutable + '"'))
-        $uiTest = Start-Process -FilePath $powershell -ArgumentList $uiArguments -Wait -PassThru -NoNewWindow
-        if ($uiTest.ExitCode -ne 0) { throw "Windows UI smoke test exited with code $($uiTest.ExitCode)." }
     }
 
     Write-Host "Portable package verification passed: $package"
