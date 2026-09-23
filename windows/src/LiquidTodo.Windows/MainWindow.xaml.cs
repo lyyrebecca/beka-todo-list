@@ -5,6 +5,8 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Forms = System.Windows.Forms;
 using LiquidTodo.Core;
 using LiquidTodo.Windows.Services;
@@ -65,6 +67,29 @@ public partial class MainWindow : Window
         if (_settings.IsMinimized) SetMinimized(false, true);
         Show(); WindowState = WindowState.Normal; Topmost = !_settings.DesktopMode; Activate(); Focus();
         if (command == "import") _tray?.Balloon("贝卡の Todo list", "已有实例已唤醒；请从托盘菜单选择导入备份。");
+    }
+
+    /// <summary>Used by the Windows CI runner to retain visual evidence of a real WPF render.</summary>
+    public void CaptureScreenshotAndExit(string outputPath)
+    {
+        Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
+        {
+            try
+            {
+                UpdateLayout();
+                var width = Math.Max(1, (int)Math.Ceiling(ActualWidth));
+                var height = Math.Max(1, (int)Math.Ceiling(ActualHeight));
+                var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+                bitmap.Render(this);
+                var directory = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                using var stream = File.Create(outputPath);
+                encoder.Save(stream);
+            }
+            finally { System.Windows.Application.Current.Shutdown(); }
+        }));
     }
 
     private static bool TryReadImport(IEnumerable<string> args, out string file)

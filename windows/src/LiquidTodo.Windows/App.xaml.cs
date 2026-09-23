@@ -44,11 +44,20 @@ public partial class App : System.Windows.Application
             _mainWindow.Closed += (_, _) => Shutdown();
             _mainWindow.Show();
             _diagnostics.Write("startup", "main window shown");
+            if (TryReadCapturePath(e.Args, out var capturePath)) _mainWindow.CaptureScreenshotAndExit(capturePath);
         }
         catch (Exception exception) { ReportFatalStartupError(exception, paths); }
     }
 
     private void HandleSecondLaunch(string command) => _mainWindow?.ActivateFromSecondLaunch(command);
+
+    private static bool TryReadCapturePath(IEnumerable<string> arguments, out string path)
+    {
+        var values = arguments.ToArray();
+        var index = Array.FindIndex(values, value => value.Equals("--capture-screenshot", StringComparison.OrdinalIgnoreCase));
+        path = index >= 0 && index + 1 < values.Length ? values[index + 1] : "";
+        return !string.IsNullOrWhiteSpace(path);
+    }
 
     protected override void OnExit(ExitEventArgs e)
     {
