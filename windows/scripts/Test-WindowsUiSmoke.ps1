@@ -140,7 +140,13 @@ try {
         if ($settings -and $settings.OwnerName -eq 'Windows验收') { break }
         Start-Sleep -Milliseconds 200
     } while ($settingsTimer.Elapsed.TotalSeconds -lt 10)
-    if (-not $settings -or $settings.OwnerName -ne 'Windows验收') { throw "First-run name was not saved to portable settings. Content: $($settings | ConvertTo-Json -Compress)" }
+    if (-not $settings -or $settings.OwnerName -ne 'Windows验收') {
+        $localSettings = Join-Path $env:LOCALAPPDATA 'LiquidTodo\settings.json'
+        $files = Get-ChildItem -LiteralPath (Split-Path $exe) -Recurse -File -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+        $logRoot = Join-Path (Split-Path $exe) 'Data\Logs'
+        $logs = Get-ChildItem -LiteralPath $logRoot -Filter 'startup-*.log' -ErrorAction SilentlyContinue | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }
+        throw "First-run name was not saved to portable settings. Portable content: $($settings | ConvertTo-Json -Compress); local settings: $(if (Test-Path $localSettings) { Get-Content $localSettings -Raw } else { '<missing>' }); files: $($files -join ' | '); startup logs: $($logs -join ' | ')"
+    }
 
     $main = Wait-WindowContainingElementId 'AddTodoButton'
     Invoke-Button (Wait-ElementById $main 'AddTodoButton')
