@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $PublishDirectory).Path
-$required = @('LiquidTodo.exe', 'LiquidTodo.dll', 'LiquidTodo.runtimeconfig.json', 'LiquidTodo.deps.json', 'Assets/LiquidTodo.ico', 'Assets/LiquidTodo.png', 'portable.flag', 'README-Windows.txt', 'LICENSE')
+$required = @('LiquidTodo.exe', 'LiquidTodo.dll', 'LiquidTodo.runtimeconfig.json', 'LiquidTodo.deps.json', 'Assets/LiquidTodo.ico', 'Assets/LiquidTodo.png', 'Assets/LiquidGlassPanel.png', 'portable.flag', 'README-Windows.txt', 'LICENSE')
 foreach ($file in $required) {
     if (-not (Test-Path -LiteralPath (Join-Path $root $file) -PathType Leaf)) {
         throw "Portable publish is missing required file: $file"

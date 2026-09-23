@@ -11,7 +11,7 @@ New-Item -ItemType Directory -Path $root | Out-Null
 
 try {
     Expand-Archive -LiteralPath $package -DestinationPath $root -Force
-    $required = @('LiquidTodo.exe', 'LiquidTodo.dll', 'LiquidTodo.runtimeconfig.json', 'LiquidTodo.deps.json', 'Assets/LiquidTodo.ico', 'Assets/LiquidTodo.png', 'portable.flag', 'README-Windows.txt', 'LICENSE', 'manifest.json')
+    $required = @('LiquidTodo.exe', 'LiquidTodo.dll', 'LiquidTodo.runtimeconfig.json', 'LiquidTodo.deps.json', 'Assets/LiquidTodo.ico', 'Assets/LiquidTodo.png', 'Assets/LiquidGlassPanel.png', 'portable.flag', 'README-Windows.txt', 'LICENSE', 'manifest.json')
     foreach ($file in $required) {
         if (-not (Test-Path -LiteralPath (Join-Path $root $file) -PathType Leaf)) { throw "Portable ZIP is missing $file" }
     }

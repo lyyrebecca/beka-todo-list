@@ -4,15 +4,18 @@
  xmlns:controls="clr-namespace:System.Windows.Controls;assembly=PresentationFramework"
  Title="贝卡の Todo list" Width="362" Height="430" WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True">
  <Window.Resources>
-  <Style x:Key="HeaderButton" TargetType="Button"><Setter Property="Foreground" Value="#625B73"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="FontSize" Value="16"/><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Cursor" Value="Hand"/></Style>
+  <Style x:Key="HeaderButton" TargetType="Button"><Setter Property="Foreground" Value="{DynamicResource SecondaryInk}"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="FontSize" Value="16"/><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Cursor" Value="Hand"/></Style>
  </Window.Resources>
  <Grid>
-  <Border x:Name="Panel" Width="350" CornerRadius="22" Background="#F7F5FC" BorderBrush="#26FFFFFF" BorderThickness="1" Padding="16" HorizontalAlignment="Left" VerticalAlignment="Top">
+  <Border x:Name="Panel" Width="350" CornerRadius="22" Background="Transparent" BorderBrush="{DynamicResource GlassBorder}" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Top">
    <Grid>
+    <Border x:Name="GlassImageLayer" CornerRadius="21" IsHitTestVisible="False"/>
+    <Border x:Name="GlassTintLayer" CornerRadius="21" Background="{DynamicResource GlassTint}" IsHitTestVisible="False"/>
+    <Grid Margin="16">
     <Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="*"/><RowDefinition Height="42"/></Grid.RowDefinitions>
     <Grid Grid.Row="0" MouseLeftButtonDown="Header_MouseLeftButtonDown">
      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="160"/></Grid.ColumnDefinitions>
-     <StackPanel><TextBlock x:Name="NameTitle" Text="贝卡の Todo list" FontSize="17" FontWeight="SemiBold" Foreground="#29213B"/><TextBlock x:Name="SubTitle" Text="今天，把一件事做好" FontSize="11" Foreground="#786F8A" Margin="0,2,0,0"/></StackPanel>
+    <StackPanel><TextBlock x:Name="NameTitle" Text="贝卡の Todo list" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource Ink}"/><TextBlock x:Name="SubTitle" Text="今天，把一件事做好" FontSize="11" Foreground="{DynamicResource Muted}" Margin="0,2,0,0"/></StackPanel>
      <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
       <Button x:Name="ArchiveButton" Style="{StaticResource HeaderButton}" ToolTip="完成历史" Click="ArchiveButton_Click" Content="◷"/>
       <Button Style="{StaticResource HeaderButton}" ToolTip="自定义待办名称" Click="CustomizeNameButton_Click" Content="⚙"/>
@@ -21,8 +24,9 @@
       <Button x:Name="SafeExitButton" Visibility="Collapsed" Style="{StaticResource HeaderButton}" ToolTip="退出" Click="SafeExitButton_Click" Content="×"/>
      </StackPanel>
     </Grid>
-    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8,0,8"><StackPanel x:Name="ItemsHost"/></ScrollViewer>
-    <Button Grid.Row="2" x:Name="AddButton" Click="AddButton_Click" Background="#7B68EE" Foreground="White" BorderThickness="0" FontSize="14" FontWeight="SemiBold" Content="＋  新建待办" Cursor="Hand"/>
+    <ScrollViewer x:Name="ItemsScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8,0,8"><StackPanel x:Name="ItemsHost"/></ScrollViewer>
+    <Button Grid.Row="2" x:Name="AddButton" Click="AddButton_Click" Background="{DynamicResource Purple}" Foreground="White" BorderThickness="0" FontSize="14" FontWeight="SemiBold" Content="＋  新建待办" Cursor="Hand"/>
+    </Grid>
    </Grid>
   </Border>
   <Grid x:Name="Orb" Width="48" Height="48" Visibility="Collapsed" MouseLeftButtonDown="Orb_MouseLeftButtonDown" MouseMove="Orb_MouseMove" MouseLeftButtonUp="Orb_MouseLeftButtonUp" Cursor="Hand">

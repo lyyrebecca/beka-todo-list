@@ -27,7 +27,7 @@ jobs:
         shell: pwsh
         run: |
           $output = (Resolve-Path release).Path + '\\windows-ui-smoke.png'
-          $process = Start-Process -FilePath (Resolve-Path windows/publish/LiquidTodo.exe) -ArgumentList @('--safe-mode', '--diagnostics', '--capture-screenshot', $output) -PassThru
+          $process = Start-Process -FilePath (Resolve-Path windows/publish/LiquidTodo.exe) -ArgumentList @('--safe-mode', '--diagnostics', '--demo-screenshot', '--capture-screenshot', $output) -PassThru
           if (-not $process.WaitForExit(30000)) { Stop-Process -Id $process.Id -Force; throw 'Timed out while rendering Windows UI evidence.' }
           if ($process.ExitCode -ne 0) { throw "UI evidence process exited with $($process.ExitCode)." }
           if (-not (Test-Path -LiteralPath $output) -or (Get-Item -LiteralPath $output).Length -lt 1024) { throw 'Windows UI evidence PNG was not produced.' }

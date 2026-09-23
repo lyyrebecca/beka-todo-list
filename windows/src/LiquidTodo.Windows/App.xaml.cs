@@ -37,7 +37,12 @@ public partial class App : System.Windows.Application
             }
 
             NativeWindow.SetCurrentProcessAppUserModelId("com.beka.liquidtodo");
-            var store = new TodoStore(new PersistenceService(paths.DataFile));
+            var previewMode = e.Args.Any(x => x.Equals("--demo-screenshot", StringComparison.OrdinalIgnoreCase));
+            var dataFile = previewMode
+                ? Path.Combine(Path.GetTempPath(), $"LiquidTodo-VisualSmoke-{Guid.NewGuid():N}", "data.json")
+                : paths.DataFile;
+            var store = new TodoStore(new PersistenceService(dataFile));
+            if (previewMode) SeedVisualPreview(store);
             _singleInstance = new SingleInstanceService(InstanceName, Dispatcher, HandleSecondLaunch);
             _singleInstance.Start();
             _mainWindow = new MainWindow(paths, store, e.Args, safeMode);
@@ -57,6 +62,16 @@ public partial class App : System.Windows.Application
         var index = Array.FindIndex(values, value => value.Equals("--capture-screenshot", StringComparison.OrdinalIgnoreCase));
         path = index >= 0 && index + 1 < values.Length ? values[index + 1] : "";
         return !string.IsNullOrWhiteSpace(path);
+    }
+
+    private static void SeedVisualPreview(TodoStore store)
+    {
+        store.Add("准备 Windows 版验收", TodoPriority.Urgent);
+        store.Add("整理发布说明与下载指引", TodoPriority.Important,
+            new TodoSchedule(TodoTimeMode.Deadline, DateTimeOffset.Now.AddHours(4), ReminderMode: TodoReminderMode.AtTime));
+        var start = DateOnly.FromDateTime(DateTime.Today.AddDays(1));
+        store.Add("完成玻璃质感界面复核", TodoPriority.Normal,
+            new TodoSchedule(TodoTimeMode.Period, StartDate: start, EndDate: start.AddDays(2), ReminderMode: TodoReminderMode.DailyDuringPeriod, ReminderTimeMinutes: 9 * 60));
     }
 
     protected override void OnExit(ExitEventArgs e)

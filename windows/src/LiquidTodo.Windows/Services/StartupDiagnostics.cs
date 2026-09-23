@@ -41,7 +41,7 @@ internal sealed class StartupDiagnostics
     {
         var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
         Write("startup", $"version={version}; portable={paths.IsPortable}; safeMode={safeMode}; " +
-            $"dataRoot={paths.Root}; arguments={string.Join(' ', arguments.Select(RedactArgument))}");
+            $"dataLocation={(paths.IsPortable ? "portable Data folder" : "Local AppData")}; arguments={string.Join(' ', arguments.Select(RedactArgument))}");
     }
 
     public void Write(string stage, string detail)
@@ -60,10 +60,19 @@ internal sealed class StartupDiagnostics
         }
     }
 
-    public void WriteException(string stage, Exception exception) => Write(stage, exception.ToString());
+    public void WriteException(string stage, Exception exception) => Write(stage, RedactLocalPaths(exception.ToString()));
 
     private static string RedactArgument(string argument) =>
         argument.Equals("--import", StringComparison.OrdinalIgnoreCase) || argument.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
             ? "<import-file>"
             : argument;
+
+    private static string RedactLocalPaths(string value)
+    {
+        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrWhiteSpace(profile)) value = value.Replace(profile, "<user-profile>", StringComparison.OrdinalIgnoreCase);
+        var username = Environment.UserName;
+        if (!string.IsNullOrWhiteSpace(username)) value = value.Replace(username, "<user>", StringComparison.OrdinalIgnoreCase);
+        return value;
+    }
 }
