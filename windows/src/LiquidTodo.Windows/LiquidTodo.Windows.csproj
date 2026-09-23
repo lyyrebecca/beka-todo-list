@@ -8,6 +8,7 @@
     <ApplicationIcon>Assets\LiquidTodo.ico</ApplicationIcon>
     <AssemblyName>LiquidTodo</AssemblyName>
     <RootNamespace>LiquidTodo.Windows</RootNamespace>
+    <Version>2.0.1</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <PublishSingleFile>false</PublishSingleFile>

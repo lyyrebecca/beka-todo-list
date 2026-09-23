@@ -2,7 +2,7 @@
   #define MyAppName "贝卡の Todo list"
 #endif
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0.0"
+  #define MyAppVersion "2.0.1"
 #endif
 #define MyAppPublisher "lyyrebecca"
 #define MyAppExeName "LiquidTodo.exe"

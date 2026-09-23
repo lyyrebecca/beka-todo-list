@@ -179,7 +179,7 @@ public partial class MainWindow : Window
             var badge = new TextBlock { Text = item.Priority == TodoPriority.Important ? "★" : "‼", Foreground = (Brush)FindResource(item.Priority == TodoPriority.Important ? "Important" : "Urgent"), FontSize = 11, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, ToolTip = item.Priority == TodoPriority.Important ? "重要" : "紧急" };
             Grid.SetColumn(badge, 1); grid.Children.Add(badge);
         }
-        var text = new TextBlock { Text = item.Text, Foreground = item.Completed ? (Brush)FindResource("Muted") : (Brush)FindResource("Ink"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.Wrap, MaxHeight = 38, Cursor = Cursors.Hand, TextDecorations = item.Completed ? TextDecorations.Strikethrough : null };
+        var text = new TextBlock { Text = item.Text, Foreground = item.Completed ? (Brush)FindResource("Muted") : (Brush)FindResource("Ink"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, Cursor = Cursors.Hand, TextDecorations = item.Completed ? TextDecorations.Strikethrough : null };
         text.MouseLeftButtonUp += (_, _) => Edit(item); Grid.SetColumn(text, 2); grid.Children.Add(text);
         var label = new TextBlock { Text = LabelFor(item), Foreground = IsOverdue(item) ? (Brush)FindResource("Urgent") : (Brush)FindResource("Purple"), FontSize = 10, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Right, TextTrimming = TextTrimming.CharacterEllipsis };
         Grid.SetColumn(label, 3); grid.Children.Add(label);
