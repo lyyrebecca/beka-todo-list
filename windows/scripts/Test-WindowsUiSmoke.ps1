@@ -133,19 +133,28 @@ try {
     Set-Text (Wait-ElementById $welcome 'OwnerNameInput') 'Windows验收'
     Invoke-Button (Wait-ElementByName $welcome '保存' ([System.Windows.Automation.ControlType]::Button))
 
-    $main = Wait-Window 'Windows验收の Todo list'
+    $settingsPath = Join-Path (Split-Path $exe) 'Data\settings.json'
+    $settingsTimer = [Diagnostics.Stopwatch]::StartNew()
+    do {
+        $settings = if (Test-Path -LiteralPath $settingsPath) { Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json } else { $null }
+        if ($settings -and $settings.OwnerName -eq 'Windows验收') { break }
+        Start-Sleep -Milliseconds 200
+    } while ($settingsTimer.Elapsed.TotalSeconds -lt 10)
+    if (-not $settings -or $settings.OwnerName -ne 'Windows验收') { throw "First-run name was not saved to portable settings. Content: $($settings | ConvertTo-Json -Compress)" }
+
+    $main = Wait-WindowContainingElementId 'AddTodoButton'
     Invoke-Button (Wait-ElementById $main 'AddTodoButton')
     $editor = Wait-WindowContainingElementId 'TodoTextBox'
     Set-Text (Wait-ElementById $editor 'TodoTextBox') 'Windows 中文输入与编辑验收'
     Invoke-Button (Wait-ElementByName $editor '保存' ([System.Windows.Automation.ControlType]::Button))
-    $main = Wait-Window 'Windows验收の Todo list'
+    $main = Wait-WindowContainingElementId 'AddTodoButton'
     Wait-Text $main 'Windows 中文输入与编辑验收'
 
     Invoke-Button (Wait-ElementByName $main '编辑待办' ([System.Windows.Automation.ControlType]::Button))
     $editor = Wait-WindowContainingElementId 'TodoTextBox'
     Set-Text (Wait-ElementById $editor 'TodoTextBox') 'Windows 中文输入编辑完成'
     Invoke-Button (Wait-ElementByName $editor '保存' ([System.Windows.Automation.ControlType]::Button))
-    $main = Wait-Window 'Windows验收の Todo list'
+    $main = Wait-WindowContainingElementId 'AddTodoButton'
     Wait-Text $main 'Windows 中文输入编辑完成'
     Wait-Text $main 'Windows 中文输入与编辑验收' $false
 
@@ -155,9 +164,9 @@ try {
             [System.Windows.Automation.ControlType]::CheckBox))
     if (-not $checkbox) { throw 'The todo completion checkbox was not exposed to UI Automation.' }
     $checkbox.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
-    $main = Wait-Window 'Windows验收の Todo list'
+    $main = Wait-WindowContainingElementId 'AddTodoButton'
     Invoke-Button (Wait-ElementByName $main '已完成 · 撤销' ([System.Windows.Automation.ControlType]::Button))
-    $main = Wait-Window 'Windows验收の Todo list'
+    $main = Wait-WindowContainingElementId 'AddTodoButton'
     Wait-Text $main 'Windows 中文输入编辑完成'
 
     Stop-Process -Id $process.Id -Force
@@ -165,7 +174,7 @@ try {
     Start-Sleep -Seconds 1
 
     $process = Start-Process -FilePath $exe -ArgumentList @('--safe-mode', '--diagnostics', '--portable') -PassThru
-    $main = Wait-Window 'Windows验收の Todo list'
+    $main = Wait-WindowContainingElementId 'AddTodoButton'
     Wait-Text $main 'Windows 中文输入编辑完成'
 
     Write-Host 'Windows UI smoke passed: first-run naming, CJK text entry, add/edit, completion undo and restart persistence.'
