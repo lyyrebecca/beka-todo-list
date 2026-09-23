@@ -131,7 +131,7 @@ public partial class MainWindow : Window
 
     private void ApplyInitialPosition()
     {
-        if (!double.IsNaN(_settings.Left) && !double.IsNaN(_settings.Top)) { Left = _settings.Left; Top = _settings.Top; }
+        if (_settings.Left is { } left && double.IsFinite(left) && _settings.Top is { } top && double.IsFinite(top)) { Left = left; Top = top; }
         else { Left = Math.Max(16, SystemParameters.WorkArea.Right - PanelWidth - 60); Top = Math.Max(16, SystemParameters.WorkArea.Top + 70); }
     }
 

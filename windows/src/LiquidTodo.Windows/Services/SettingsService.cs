@@ -3,7 +3,7 @@ using LiquidTodo.Core;
 
 namespace LiquidTodo.Windows.Services;
 
-internal sealed record AppSettings(string? OwnerName = null, bool IsMinimized = false, bool DesktopMode = false, double Left = double.NaN, double Top = double.NaN);
+internal sealed record AppSettings(string? OwnerName = null, bool IsMinimized = false, bool DesktopMode = false, double? Left = null, double? Top = null);
 internal sealed class SettingsService
 {
     private readonly string _path;
