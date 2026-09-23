@@ -33,6 +33,25 @@ function Wait-Window([string]$name, [int]$timeoutSeconds = 15) {
     throw "Timed out waiting for window '$name'. Open top-level UIA windows: $($openWindows -join ' | ')"
 }
 
+function Find-WindowContainingElementId([string]$automationId) {
+    $windows = $script:root.FindAll($script:children, $script:all)
+    for ($i = 0; $i -lt $windows.Count; $i++) {
+        $window = $windows.Item($i)
+        if (Find-ElementById $window $automationId) { return $window }
+    }
+    return $null
+}
+
+function Wait-WindowContainingElementId([string]$automationId, [int]$timeoutSeconds = 15) {
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    do {
+        $window = Find-WindowContainingElementId $automationId
+        if ($window) { return $window }
+        Start-Sleep -Milliseconds 250
+    } while ($timer.Elapsed.TotalSeconds -lt $timeoutSeconds)
+    throw "Timed out waiting for a window containing AutomationId '$automationId'."
+}
+
 function Find-ElementById($window, [string]$automationId) {
     $condition = [System.Windows.Automation.PropertyCondition]::new(
         [System.Windows.Automation.AutomationElement]::AutomationIdProperty, $automationId)
@@ -108,20 +127,22 @@ try {
         throw "Application exited before the first-run window appeared. $($logs -join "`n")"
     }
 
-    $welcome = Wait-Window '欢迎使用'
+    # Some Windows hosted-runner UIA providers expose owned WPF dialogs with an
+    # empty Window.Name. Find those by their stable control AutomationId instead.
+    $welcome = Wait-WindowContainingElementId 'OwnerNameInput'
     Set-Text (Wait-ElementById $welcome 'OwnerNameInput') 'Windows验收'
     Invoke-Button (Wait-ElementByName $welcome '保存' ([System.Windows.Automation.ControlType]::Button))
 
     $main = Wait-Window 'Windows验收の Todo list'
     Invoke-Button (Wait-ElementById $main 'AddTodoButton')
-    $editor = Wait-Window '待办'
+    $editor = Wait-WindowContainingElementId 'TodoTextBox'
     Set-Text (Wait-ElementById $editor 'TodoTextBox') 'Windows 中文输入与编辑验收'
     Invoke-Button (Wait-ElementByName $editor '保存' ([System.Windows.Automation.ControlType]::Button))
     $main = Wait-Window 'Windows验收の Todo list'
     Wait-Text $main 'Windows 中文输入与编辑验收'
 
     Invoke-Button (Wait-ElementByName $main '编辑待办' ([System.Windows.Automation.ControlType]::Button))
-    $editor = Wait-Window '待办'
+    $editor = Wait-WindowContainingElementId 'TodoTextBox'
     Set-Text (Wait-ElementById $editor 'TodoTextBox') 'Windows 中文输入编辑完成'
     Invoke-Button (Wait-ElementByName $editor '保存' ([System.Windows.Automation.ControlType]::Button))
     $main = Wait-Window 'Windows验收の Todo list'
