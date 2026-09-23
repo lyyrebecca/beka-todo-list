@@ -8,14 +8,14 @@ namespace LiquidTodo.Windows;
 public partial class TodoEditorWindow : Window
 {
     private readonly TodoItem? _item;
-    public string TodoText => TextInput.Text;
+    public string TodoText => TodoTextBox.Text;
     public TodoPriority Priority => ParseEnum<TodoPriority>(PriorityInput);
     public TodoSchedule? Schedule { get; private set; }
     public TodoEditorWindow(TodoItem? item)
     {
         InitializeComponent(); _item = item; TitleText.Text = item is null ? "新建待办" : "编辑待办";
         var schedule = item?.Schedule;
-        TextInput.Text = item?.Text ?? "";
+        TodoTextBox.Text = item?.Text ?? "";
         Select(PriorityInput, item?.Priority ?? TodoPriority.Normal);
         Select(ModeInput, schedule?.Mode ?? TodoTimeMode.None);
         Select(ReminderInput, schedule?.ReminderMode ?? TodoReminderMode.None);
@@ -24,7 +24,7 @@ public partial class TodoEditorWindow : Window
         StartInput.SelectedDate = schedule?.StartDate?.ToDateTime(TimeOnly.MinValue) ?? DateTime.Today;
         EndInput.SelectedDate = schedule?.EndDate?.ToDateTime(TimeOnly.MinValue) ?? DateTime.Today.AddDays(1);
         if (schedule is { ReminderTimeMinutes: var minute }) TimeInput.Text = $"{minute / 60:00}:{minute % 60:00}";
-        Loaded += (_, _) => { TextInput.Focus(); TextInput.SelectAll(); RefreshRows(); };
+        Loaded += (_, _) => { TodoTextBox.Focus(); TodoTextBox.SelectAll(); RefreshRows(); };
     }
     private void ModeInput_SelectionChanged(object sender, SelectionChangedEventArgs e) { if (IsLoaded) { var mode = ParseEnum<TodoTimeMode>(ModeInput); if (mode == TodoTimeMode.Period) { Select(ReminderInput, TodoReminderMode.DailyDuringPeriod); TimeInput.Text = "09:00"; } else if (mode != TodoTimeMode.None) Select(ReminderInput, TodoReminderMode.AtTime); RefreshRows(); } }
     private void ReminderInput_SelectionChanged(object sender, SelectionChangedEventArgs e) { if (IsLoaded && ParseEnum<TodoReminderMode>(ReminderInput) == TodoReminderMode.DayBefore) TimeInput.Text = "21:00"; }

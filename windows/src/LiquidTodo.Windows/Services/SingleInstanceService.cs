@@ -20,7 +20,7 @@ internal sealed class SingleInstanceService : IDisposable
                 await pipe.WaitForConnectionAsync(_cancel.Token);
                 using var reader = new StreamReader(pipe, Encoding.UTF8, leaveOpen: true);
                 var command = await reader.ReadLineAsync(_cancel.Token) ?? "activate";
-                _dispatcher.BeginInvoke(() => _onSignal(command));
+                _ = _dispatcher.BeginInvoke(() => _onSignal(command));
             }
             catch (OperationCanceledException) { break; }
             catch { await Task.Delay(250, _cancel.Token); }
