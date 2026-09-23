@@ -1,4 +1,4 @@
-param([Parameter(Mandatory = $true)][string]$ExecutablePath)
+﻿param([Parameter(Mandatory = $true)][string]$ExecutablePath)
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
