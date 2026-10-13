@@ -20,7 +20,7 @@
       <Button x:Name="ArchiveButton" Style="{StaticResource HeaderButton}" ToolTip="完成历史" Click="ArchiveButton_Click" Content="◷"/>
       <Button Style="{StaticResource HeaderButton}" ToolTip="自定义待办名称" Click="CustomizeNameButton_Click" Content="⚙"/>
       <Button x:Name="DesktopButton" Style="{StaticResource HeaderButton}" ToolTip="沉入桌面" Click="DesktopButton_Click" Content="⌁"/>
-      <Button x:Name="MinimizeButton" Style="{StaticResource HeaderButton}" ToolTip="收起为悬浮球" Click="MinimizeButton_Click" Content="−"/>
+      <Button x:Name="MinimizeButton" AutomationProperties.AutomationId="MinimizeButton" Style="{StaticResource HeaderButton}" ToolTip="收起为悬浮球" Click="MinimizeButton_Click" Content="−"/>
       <Button x:Name="SafeExitButton" Visibility="Collapsed" Style="{StaticResource HeaderButton}" ToolTip="退出" Click="SafeExitButton_Click" Content="×"/>
      </StackPanel>
     </Grid>
@@ -29,7 +29,7 @@
     </Grid>
    </Grid>
   </Border>
-  <Grid x:Name="Orb" Width="48" Height="48" Visibility="Collapsed" MouseLeftButtonDown="Orb_MouseLeftButtonDown" MouseMove="Orb_MouseMove" MouseLeftButtonUp="Orb_MouseLeftButtonUp" Cursor="Hand">
+  <Grid x:Name="Orb" AutomationProperties.AutomationId="FloatingOrb" HorizontalAlignment="Left" VerticalAlignment="Top" LostMouseCapture="Orb_LostMouseCapture" Width="48" Height="48" Visibility="Collapsed" MouseLeftButtonDown="Orb_MouseLeftButtonDown" MouseMove="Orb_MouseMove" MouseLeftButtonUp="Orb_MouseLeftButtonUp" Cursor="Hand">
    <Ellipse>
     <Ellipse.Fill><RadialGradientBrush GradientOrigin="0.31,0.25" Center="0.5,0.5" RadiusX="0.65" RadiusY="0.65"><GradientStop Color="#D2CAFF" Offset="0"/><GradientStop Color="#9B8EF4" Offset="0.43"/><GradientStop Color="#7B68EE" Offset="0.72"/><GradientStop Color="#C1B8FF" Offset="1"/></RadialGradientBrush></Ellipse.Fill>
    </Ellipse>

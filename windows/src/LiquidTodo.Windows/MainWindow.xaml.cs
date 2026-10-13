@@ -27,7 +27,14 @@ public partial class MainWindow : Window
     private readonly ToastNotificationService? _toasts;
     private readonly bool _safeMode;
     private readonly Dictionary<Guid, System.Windows.Threading.DispatcherTimer> _undoTimers = [];
-    private System.Windows.Point _orbStartMouse, _orbStartWindow;
+    private NativeWindow.Point _orbStartMouse;
+    private double _grabX, _grabY;
+    private bool _orbPressed;
+    private readonly DispatcherTimer _positionSaveTimer = new() { Interval = TimeSpan.FromMilliseconds(300) };
+    private readonly DispatcherTimer _snapTimer = new() { Interval = TimeSpan.FromMilliseconds(16) };
+    private RectD? _motionTarget, _motionStart;
+    private DateTime _motionStarted;
+    private bool _settingsErrorReported;
     private bool _orbDragging;
     private bool _ready;
     private bool _showAllItems;
@@ -39,12 +46,16 @@ public partial class MainWindow : Window
         InitializeGlassBackground();
         ApplyTheme();
         SystemEvents.UserPreferenceChanged += SystemPreferenceChanged;
+        SystemEvents.DisplaySettingsChanged += DisplaySettingsChanged;
+        SystemEvents.PowerModeChanged += PowerModeChanged;
+        _positionSaveTimer.Tick += (_, _) => { _positionSaveTimer.Stop(); SavePosition(); };
+        _snapTimer.Tick += (_, _) => TickSnap();
         if (!safeMode)
         {
             // Publish preserves the Assets directory.  Looking beside the EXE was
             // the direct cause of the released Portable build exiting on startup.
-            _tray = new TrayService(Path.Combine(AppContext.BaseDirectory, "Assets", "LiquidTodo.ico"), ToggleVisible, StartAdd, ToggleDesktopMode, () => _settings.DesktopMode, ToggleStartup, () => _startup.IsEnabled, ImportBackup, ExportBackup, ClearArchived, () => System.Windows.Application.Current.Shutdown());
-            _toasts = new ToastNotificationService(_tray.Balloon);
+            _tray = new TrayService(Path.Combine(AppContext.BaseDirectory, "Assets", "LiquidTodo.ico"), ToggleVisible, StartAdd, ToggleDesktopMode, () => _settings.DesktopMode, ToggleStartup, () => _startup.IsEnabled, ImportBackup, ExportBackup, ClearArchived, () => System.Windows.Application.Current.Shutdown(), RecoverWindow);
+            _toasts = new ToastNotificationService(_tray.Balloon, _store.UpcomingReminders, () => $"{OwnerName}の Todo list");
         }
         else
         {
@@ -64,7 +75,8 @@ public partial class MainWindow : Window
             if (TryReadImport(arguments, out var import)) ImportBackup(import);
             _ready = true;
         };
-        Closed += (_, _) => { SystemEvents.UserPreferenceChanged -= SystemPreferenceChanged; _toasts?.Dispose(); _tray?.Dispose(); foreach (var timer in _undoTimers.Values) timer.Stop(); };
+        Closing += (_, _) => { _positionSaveTimer.Stop(); StopSnap(); if (_ready) SavePosition(); };
+        Closed += (_, _) => { _positionSaveTimer.Stop(); _snapTimer.Stop(); SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged; SystemEvents.PowerModeChanged -= PowerModeChanged; SystemEvents.UserPreferenceChanged -= SystemPreferenceChanged; _toasts?.Dispose(); _tray?.Dispose(); foreach (var timer in _undoTimers.Values) timer.Stop(); };
     }
 
     private void InitializeGlassBackground()
@@ -96,7 +108,7 @@ public partial class MainWindow : Window
     public void ActivateFromSecondLaunch(string command)
     {
         if (_settings.IsMinimized) SetMinimized(false, true);
-        Show(); WindowState = WindowState.Normal; Topmost = !_settings.DesktopMode; Activate(); Focus();
+        Show(); WindowState = WindowState.Normal; _settings = _settings with { DesktopMode = false }; ApplyDesktopMode(); EnsureVisible(); SaveSettings(); Activate(); Focus();
         if (command == "import") _tray?.Balloon("贝卡の Todo list", "已有实例已唤醒；请从托盘菜单选择导入备份。");
     }
 
@@ -129,10 +141,41 @@ public partial class MainWindow : Window
         file = pos >= 0 && pos + 1 < values.Length ? values[pos + 1] : ""; return File.Exists(file);
     }
 
-    private void ApplyInitialPosition()
+    private static RectD WorkArea(Forms.Screen screen) => new(screen.WorkingArea.Left, screen.WorkingArea.Top, screen.WorkingArea.Width, screen.WorkingArea.Height);
+    private Forms.Screen CurrentScreen()
     {
-        if (_settings.Left is { } left && double.IsFinite(left) && _settings.Top is { } top && double.IsFinite(top)) { Left = left; Top = top; }
-        else { Left = Math.Max(16, SystemParameters.WorkArea.Right - PanelWidth - 60); Top = Math.Max(16, SystemParameters.WorkArea.Top + 70); }
+        var bounds = NativeWindow.Bounds(this);
+        return Forms.Screen.FromPoint(new System.Drawing.Point((int)(bounds.X + bounds.Width / 2), (int)(bounds.Y + bounds.Height / 2)));
+    }
+    private void ApplyInitialPosition() => RestorePlacement(_settings.IsMinimized && !_safeMode);
+    private void RestorePlacement(bool orb)
+    {
+        var placement = orb ? _settings.OrbPlacement : _settings.PanelPlacement;
+        var screen = Forms.Screen.AllScreens.FirstOrDefault(x => x.DeviceName == placement?.MonitorId)
+            ?? Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
+        var bounds = NativeWindow.Bounds(this);
+        var target = WindowSnapService.Restore(placement, WorkArea(screen), bounds.Width, bounds.Height);
+        NativeWindow.Move(this, target.X, target.Y);
+    }
+    private void EnsureVisible()
+    {
+        var bounds = NativeWindow.Bounds(this);
+        if (bounds.Width <= 0 || bounds.Height <= 0) return;
+        var area = WorkArea(CurrentScreen());
+        var target = WindowSnapService.ClampToWorkArea(bounds, area, WindowSnapService.DipsToPixels(7, NativeWindow.Dpi(this)));
+        NativeWindow.Move(this, target.X, target.Y);
+    }
+    private void DisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(new Action(() =>
+    {
+        if (!_ready) return;
+        StopSnap(); EndOrbGesture(false); EnsureVisible(); if (_settings.IsMinimized) SnapOrb(false); SavePosition();
+    }));
+    private void PowerModeChanged(object sender, PowerModeChangedEventArgs e)
+    { if (e.Mode == PowerModes.Resume) Dispatcher.BeginInvoke(new Action(() => { EnsureVisible(); _toasts?.Rebuild(); })); }
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        Dispatcher.BeginInvoke(new Action(() => { if (_ready && !_orbPressed) { EnsureVisible(); if (_settings.IsMinimized) SnapOrb(false); } }));
     }
 
     private void Render()
@@ -163,7 +206,7 @@ public partial class MainWindow : Window
         AddButton.Visibility = showArchive ? Visibility.Collapsed : Visibility.Visible;
         var visibleCount = showArchive ? Math.Min(7, source.Count) : Math.Min(_showAllItems ? 8 : 10, source.Count);
         AnimateTo(PanelWidth, Math.Max(190, Math.Min(640, 150 + visibleCount * 48 + (showArchive ? 48 : 42))), false);
-        _toasts?.Rebuild(_store.UpcomingReminders(DateTimeOffset.Now));
+        _toasts?.Rebuild();
     }
 
     private Border CreateTodoRow(TodoItem item)
@@ -284,7 +327,7 @@ public partial class MainWindow : Window
 
     private void CustomizeNameButton_Click(object sender, RoutedEventArgs e) => CustomizeOwnerName();
     private void EnsureOwnerName() { if (_settings.OwnerName is null) CustomizeOwnerName(); }
-    private void CustomizeOwnerName() { var dialog = new NameSetupWindow(OwnerName) { Owner = this }; if (dialog.ShowDialog() == true) { var owner = string.IsNullOrWhiteSpace(dialog.OwnerName) ? "贝卡" : dialog.OwnerName[..Math.Min(20, dialog.OwnerName.Length)]; _settings = _settings with { OwnerName = owner }; _settingsService.Save(_settings); Render(); } }
+    private void CustomizeOwnerName() { var dialog = new NameSetupWindow(OwnerName) { Owner = this }; if (dialog.ShowDialog() == true) { var owner = string.IsNullOrWhiteSpace(dialog.OwnerName) ? "贝卡" : dialog.OwnerName[..Math.Min(20, dialog.OwnerName.Length)]; _settings = _settings with { OwnerName = owner }; SaveSettings(); Render(); } }
 
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -307,44 +350,123 @@ public partial class MainWindow : Window
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SetMinimized(true, true);
     private void SetMinimized(bool minimized, bool animate)
     {
-        _settings = _settings with { IsMinimized = minimized }; _settingsService.Save(_settings);
-        Panel.Visibility = minimized ? Visibility.Collapsed : Visibility.Visible; Orb.Visibility = minimized ? Visibility.Visible : Visibility.Collapsed;
-        var targetWidth = minimized ? OrbSize : PanelWidth; var targetHeight = minimized ? OrbSize : Math.Max(190, Height);
-        AnimateTo(targetWidth, targetHeight, animate); if (minimized) SnapOrb(false); else Render();
+        StopSnap(); EndOrbGesture(false);
+        if (_ready) SavePosition();
+        _settings = _settings with { IsMinimized = minimized, DesktopMode = minimized && _settings.DesktopMode };
+        Panel.Visibility = minimized ? Visibility.Collapsed : Visibility.Visible;
+        Orb.Visibility = minimized ? Visibility.Visible : Visibility.Collapsed;
+        AnimateTo(minimized ? OrbSize : PanelWidth, minimized ? OrbSize : 190, animate);
+        if (!minimized) Render();
+        RestorePlacement(minimized);
+        if (minimized) SnapOrb(false); else EnsureVisible();
+        ApplyDesktopMode(); SavePosition();
     }
     private void AnimateTo(double width, double height, bool animate)
     {
-        var oldW = Width; var oldH = Height; Width = width; Height = height;
-        if (!animate || !SystemParameters.ClientAreaAnimation) return;
-        var duration = new Duration(TimeSpan.FromMilliseconds(220));
-        BeginAnimation(WidthProperty, new DoubleAnimation(oldW, width, duration) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
-        BeginAnimation(HeightProperty, new DoubleAnimation(oldH, height, duration) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+        // Window geometry must never retain a WPF HoldEnd animation. Window and
+        // cursor positions are Win32 physical pixels; visual easing is separate.
+        foreach (var property in new[] { LeftProperty, TopProperty, WidthProperty, HeightProperty }) BeginAnimation(property, null);
+        Width = width; Height = height; UpdateLayout();
+        if (_ready) EnsureVisible();
+        var surface = _settings.IsMinimized && !_safeMode ? (FrameworkElement)Orb : Panel;
+        surface.BeginAnimation(OpacityProperty, null); surface.Opacity = 1;
+        if (animate && SystemParameters.ClientAreaAnimation)
+            surface.BeginAnimation(OpacityProperty, new DoubleAnimation(.8, 1, TimeSpan.FromMilliseconds(160)) { FillBehavior = FillBehavior.Stop });
     }
-
-    private void Orb_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { _orbStartMouse = PointToScreen(e.GetPosition(this)); _orbStartWindow = new System.Windows.Point(Left, Top); _orbDragging = false; Orb.CaptureMouse(); }
-    private void Orb_MouseMove(object sender, System.Windows.Input.MouseEventArgs e) { if (!Orb.IsMouseCaptured || e.LeftButton != MouseButtonState.Pressed) return; var now = PointToScreen(e.GetPosition(this)); var dx = now.X - _orbStartMouse.X; var dy = now.Y - _orbStartMouse.Y; if (Math.Abs(dx) + Math.Abs(dy) > 2) _orbDragging = true; Left = _orbStartWindow.X + dx; Top = _orbStartWindow.Y + dy; }
-    private void Orb_MouseLeftButtonUp(object sender, MouseButtonEventArgs e) { Orb.ReleaseMouseCapture(); if (_orbDragging) SnapOrb(true); else SetMinimized(false, true); }
+    private void Orb_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        StopSnap();
+        _orbStartMouse = NativeWindow.CursorPosition(); var bounds = NativeWindow.Bounds(this);
+        _grabX = (_orbStartMouse.X - bounds.X) / Math.Max(1, bounds.Width);
+        _grabY = (_orbStartMouse.Y - bounds.Y) / Math.Max(1, bounds.Height);
+        _orbDragging = false; _orbPressed = Orb.CaptureMouse(); e.Handled = true;
+    }
+    private void Orb_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_orbPressed || !Orb.IsMouseCaptured) return;
+        if (e.LeftButton != MouseButtonState.Pressed) { EndOrbGesture(true); return; }
+        var cursor = NativeWindow.CursorPosition();
+        if (Math.Abs(cursor.X - _orbStartMouse.X) + Math.Abs(cursor.Y - _orbStartMouse.Y) > WindowSnapService.DipsToPixels(3, NativeWindow.Dpi(this))) _orbDragging = true;
+        if (!_orbDragging) return;
+        var bounds = NativeWindow.Bounds(this);
+        var screen = Forms.Screen.FromPoint(new System.Drawing.Point(cursor.X, cursor.Y));
+        var target = WindowSnapService.ClampToWorkArea(bounds with { X = cursor.X - _grabX * bounds.Width, Y = cursor.Y - _grabY * bounds.Height }, WorkArea(screen), 0);
+        NativeWindow.Move(this, target.X, target.Y); e.Handled = true;
+    }
+    private void Orb_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_orbPressed) return;
+        var wasDrag = _orbDragging; EndOrbGesture(false);
+        if (wasDrag) SnapOrb(true); else SetMinimized(false, true); e.Handled = true;
+    }
+    private void Orb_LostMouseCapture(object sender, MouseEventArgs e) { if (_orbPressed) EndOrbGesture(true); }
+    private void EndOrbGesture(bool snap)
+    {
+        var pressed = _orbPressed; _orbPressed = false;
+        if (Orb.IsMouseCaptured) Orb.ReleaseMouseCapture();
+        if (snap && pressed && _settings.IsMinimized) SnapOrb(true);
+    }
     private void SnapOrb(bool animate)
     {
-        var hwnd = new WindowInteropHelper(this).Handle; var screen = Forms.Screen.FromHandle(hwnd); var area = screen.WorkingArea;
-        var target = WindowSnapService.SnapToNearestEdge(new RectD(Left, Top, Width, Height), new RectD(area.Left, area.Top, area.Width, area.Height));
-        var oldLeft = Left; Left = target.X; Top = target.Y;
-        if (animate && SystemParameters.ClientAreaAnimation) BeginAnimation(LeftProperty, new DoubleAnimation(oldLeft, target.X, TimeSpan.FromMilliseconds(180)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
-        SavePosition();
+        StopSnap();
+        var start = NativeWindow.Bounds(this);
+        var target = WindowSnapService.SnapToNearestEdge(start, WorkArea(CurrentScreen()), WindowSnapService.DipsToPixels(7, NativeWindow.Dpi(this)));
+        if (animate && SystemParameters.ClientAreaAnimation)
+        {
+            _motionStart = start; _motionTarget = target; _motionStarted = DateTime.UtcNow; _snapTimer.Start();
+        }
+        else { NativeWindow.Move(this, target.X, target.Y); SavePosition(); }
+    }
+    private void TickSnap()
+    {
+        if (_motionStart is not {} start || _motionTarget is not {} target) { StopSnap(); return; }
+        var progress = Math.Clamp((DateTime.UtcNow - _motionStarted).TotalMilliseconds / 180, 0, 1);
+        var eased = 1 - Math.Pow(1 - progress, 3);
+        NativeWindow.Move(this, start.X + (target.X - start.X) * eased, start.Y + (target.Y - start.Y) * eased);
+        if (progress >= 1) { StopSnap(); EnsureVisible(); SavePosition(); }
+    }
+    private void StopSnap() { _snapTimer.Stop(); _motionTarget = null; _motionStart = null; }
+    private void RecoverWindow()
+    {
+        Show(); WindowState = WindowState.Normal; StopSnap(); EndOrbGesture(false);
+        _settings = _settings with { DesktopMode = false, PanelPlacement = null };
+        SetMinimized(false, false); RestorePlacement(false); EnsureVisible(); Activate(); Focus(); SavePosition();
     }
 
     private void DesktopButton_Click(object sender, RoutedEventArgs e) => ToggleDesktopMode();
-    private void ToggleDesktopMode() { _settings = _settings with { DesktopMode = !_settings.DesktopMode }; _settingsService.Save(_settings); ApplyDesktopMode(); }
-    private void ApplyDesktopMode() { if (_safeMode) return; DesktopModeService.Apply(this, _settings.DesktopMode); _tray?.Balloon("贝卡の Todo list", _settings.DesktopMode ? "已沉入桌面：纯展示，鼠标会穿透。" : "已恢复可交互模式。"); }
+    private void ToggleDesktopMode() { _settings = _settings with { DesktopMode = !_settings.DesktopMode }; SaveSettings(); ApplyDesktopMode(); }
+    private void ApplyDesktopMode() { if (_safeMode) return; DesktopModeService.Apply(this, _settings.DesktopMode && !_settings.IsMinimized); _tray?.Balloon("贝卡の Todo list", _settings.DesktopMode ? "已沉入桌面：纯展示，鼠标会穿透。" : "已恢复可交互模式。"); }
     private void ToggleStartup() { _startup.SetEnabled(!_startup.IsEnabled); _tray?.Balloon("贝卡の Todo list", _startup.IsEnabled ? "已设为开机自动启动。" : "已关闭开机自动启动。"); }
     private void ToggleVisible() { if (!IsVisible) { Show(); ActivateFromSecondLaunch("activate"); } else Hide(); }
     private void ExportBackup() { var dialog = new Microsoft.Win32.SaveFileDialog { Filter = "LiquidTodo Backup|*.json", FileName = $"LiquidTodo-Backup-{DateTime.Now:yyyyMMdd-HHmmss}.json" }; if (dialog.ShowDialog(this) == true) { _store.Export(dialog.FileName); _tray?.Balloon("导出完成", Path.GetFileName(dialog.FileName)); } }
     private void ImportBackup() { var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "LiquidTodo Backup 或旧版数据|*.json" }; if (dialog.ShowDialog(this) == true) ImportBackup(dialog.FileName); }
+    internal void ImportRequestedBackup(string file) => ImportBackup(file);
     private void ImportBackup(string file)
     {
         try { var replace = MessageBox.Show(this, "默认会安全合并并按 UUID 去重。选择“是”可替换本机全部待办（导入前仍会自动备份）。", "导入备份", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes; var result = _store.Import(file, replace ? ImportMode.Replace : ImportMode.Merge); _tray?.Balloon("导入完成", $"新增 {result.ImportedItems + result.ImportedArchived} 项，跳过 {result.SkippedDuplicates} 项。已自动备份。"); } catch (Exception ex) { MessageBox.Show(this, $"无法导入备份：{ex.Message}", "贝卡の Todo list", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
-    private void SavePosition() { _settings = _settings with { Left = Left, Top = Top }; _settingsService.Save(_settings); }
-    protected override void OnLocationChanged(EventArgs e) { base.OnLocationChanged(e); if (_ready) SavePosition(); }
+    private void SaveSettings()
+    {
+        if (_settingsService.TrySave(_settings, out var error)) { _settingsErrorReported = false; return; }
+        if (_settingsErrorReported) return;
+        _settingsErrorReported = true;
+        if (_tray is not null) _tray.Balloon("设置未保存", "请检查目录权限或磁盘空间，应用仍可继续使用。");
+        else MessageBox.Show("设置未保存：" + error, "贝卡の Todo list");
+    }
+    private void SavePosition()
+    {
+        var bounds = NativeWindow.Bounds(this);
+        if (bounds.Width <= 0 || bounds.Height <= 0) return;
+        var screen = CurrentScreen();
+        var placement = WindowSnapService.Capture(bounds, WorkArea(screen), screen.DeviceName);
+        _settings = _settings.IsMinimized && !_safeMode ? _settings with { OrbPlacement = placement } : _settings with { PanelPlacement = placement };
+        _settings = _settings with { PlacementVersion = 2, Left = null, Top = null }; SaveSettings();
+    }
+    protected override void OnLocationChanged(EventArgs e)
+    {
+        base.OnLocationChanged(e);
+        if (!_ready) return;
+        _positionSaveTimer.Stop(); _positionSaveTimer.Start();
+    }
     protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e) { if (e.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control) { StartAdd(); e.Handled = true; } base.OnKeyDown(e); }
 }
