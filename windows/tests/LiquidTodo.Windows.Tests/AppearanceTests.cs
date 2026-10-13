@@ -9,7 +9,7 @@ public class AppearanceTests
     public void Small_text_remains_readable_on_both_day_and_night_surfaces(bool dark)
     {
         var p = AppearancePalette.For(dark);
-        foreach (var background in new[] { p.FillTop, p.FillBottom, p.RowFill })
+        foreach (var background in new[] { p.FillTop, p.FillBottom, p.RowFill, p.InputFill })
         foreach (var foreground in new[] { p.Ink, p.Muted, p.SecondaryInk })
             Assert.True(Contrast(foreground, background) >= 4.5, $"{p.Name}: {foreground}/{background}");
         foreach (var foreground in new[] { p.AccentText, p.Important, p.Urgent })

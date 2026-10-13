@@ -1,5 +1,6 @@
 <Application x:Class="LiquidTodo.Windows.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnExplicitShutdown">
   <Application.Resources>
@@ -16,6 +17,7 @@
     <SolidColorBrush x:Key="InputFill" Color="#E3D8F2"/>
     <SolidColorBrush x:Key="InputBorder" Color="#A58CBC"/>
     <Style TargetType="TextBox"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource InputBorder}"/><Setter Property="Padding" Value="4"/></Style>
+    <Style TargetType="{x:Type primitives:DatePickerTextBox}"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/></Style>
     <Style TargetType="DatePicker"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource InputBorder}"/></Style>
     <Style TargetType="ComboBox"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource InputBorder}"/></Style>
     <Style TargetType="ComboBoxItem"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Style.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter Property="Background" Value="{DynamicResource Purple}"/><Setter Property="Foreground" Value="{DynamicResource AccentInk}"/></Trigger></Style.Triggers></Style>

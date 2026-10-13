@@ -24,7 +24,7 @@ internal static class WindowsThemeService
             ("Ink", p.Ink), ("Muted", p.Muted), ("SecondaryInk", p.SecondaryInk),
             ("Purple", p.Accent), ("AccentText", p.AccentText), ("AccentInk", p.AccentInk), ("Urgent", p.Urgent),
             ("Important", p.Important), ("RowFill", p.RowFill), ("Surface", p.Surface),
-            ("InputFill", dark ? "473852" : "E3D8F2"), ("InputBorder", dark ? "A58DBC" : "A58CBC") })
+            ("InputFill", p.InputFill), ("InputBorder", p.InputBorder) })
         {
             var brush = new SolidColorBrush(ColorFrom(hex)); brush.Freeze(); resources[key] = brush;
         }
