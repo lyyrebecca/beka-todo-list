@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -33,7 +34,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _positionSaveTimer = new() { Interval = TimeSpan.FromMilliseconds(300) };
     private readonly DispatcherTimer _snapTimer = new() { Interval = TimeSpan.FromMilliseconds(16) };
     private RectD? _motionTarget, _motionStart;
-    private DateTime _motionStarted;
+    private readonly Stopwatch _motionClock = new();
     private bool _settingsErrorReported;
     private bool _orbDragging;
     private bool _ready;
@@ -75,7 +76,7 @@ public partial class MainWindow : Window
             if (TryReadImport(arguments, out var import)) ImportBackup(import);
             _ready = true;
         };
-        Closing += (_, _) => { _positionSaveTimer.Stop(); StopSnap(); if (_ready) SavePosition(); };
+        Closing += (_, _) => { _positionSaveTimer.Stop(); StopSnap(); if (_ready) SavePosition(); _ready = false; };
         Closed += (_, _) => { _positionSaveTimer.Stop(); _snapTimer.Stop(); SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged; SystemEvents.PowerModeChanged -= PowerModeChanged; SystemEvents.UserPreferenceChanged -= SystemPreferenceChanged; _toasts?.Dispose(); _tray?.Dispose(); foreach (var timer in _undoTimers.Values) timer.Stop(); };
     }
 
@@ -154,7 +155,9 @@ public partial class MainWindow : Window
         var screen = Forms.Screen.AllScreens.FirstOrDefault(x => x.DeviceName == placement?.MonitorId)
             ?? Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
         var bounds = NativeWindow.Bounds(this);
-        var target = WindowSnapService.Restore(placement, WorkArea(screen), bounds.Width, bounds.Height);
+        var area = WorkArea(screen);
+        if (area.Width <= 0 || area.Height <= 0) return;
+        var target = WindowSnapService.Restore(placement, area, bounds.Width, bounds.Height);
         NativeWindow.Move(this, target.X, target.Y);
     }
     private void EnsureVisible()
@@ -163,6 +166,7 @@ public partial class MainWindow : Window
         var bounds = NativeWindow.Bounds(this);
         if (bounds.Width <= 0 || bounds.Height <= 0) return;
         var area = WorkArea(CurrentScreen());
+        if (area.Width <= 0 || area.Height <= 0) return;
         var target = WindowSnapService.ClampToWorkArea(bounds, area, WindowSnapService.DipsToPixels(7, NativeWindow.Dpi(this)));
         NativeWindow.Move(this, target.X, target.Y);
     }
@@ -172,7 +176,7 @@ public partial class MainWindow : Window
         StopSnap(); EndOrbGesture(false); EnsureVisible(); if (_settings.IsMinimized) SnapOrb(false); SavePosition();
     }));
     private void PowerModeChanged(object sender, PowerModeChangedEventArgs e)
-    { if (e.Mode == PowerModes.Resume) Dispatcher.BeginInvoke(new Action(() => { EnsureVisible(); _toasts?.Rebuild(); })); }
+    { if (e.Mode == PowerModes.Resume) Dispatcher.BeginInvoke(new Action(() => { if (_ready) { EnsureVisible(); _toasts?.Rebuild(); } })); }
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
     {
         base.OnDpiChanged(oldDpi, newDpi);
@@ -379,7 +383,8 @@ public partial class MainWindow : Window
     private void Orb_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         StopSnap();
-        _orbStartMouse = NativeWindow.CursorPosition(); var bounds = NativeWindow.Bounds(this);
+        if (!NativeWindow.TryCursorPosition(out _orbStartMouse)) return;
+        var bounds = NativeWindow.Bounds(this);
         _grabX = (_orbStartMouse.X - bounds.X) / Math.Max(1, bounds.Width);
         _grabY = (_orbStartMouse.Y - bounds.Y) / Math.Max(1, bounds.Height);
         _orbDragging = false; _orbPressed = Orb.CaptureMouse(); e.Handled = true;
@@ -388,12 +393,14 @@ public partial class MainWindow : Window
     {
         if (!_orbPressed || !Orb.IsMouseCaptured) return;
         if (e.LeftButton != MouseButtonState.Pressed) { EndOrbGesture(true); return; }
-        var cursor = NativeWindow.CursorPosition();
+        if (!NativeWindow.TryCursorPosition(out var cursor)) return;
         if (Math.Abs(cursor.X - _orbStartMouse.X) + Math.Abs(cursor.Y - _orbStartMouse.Y) > WindowSnapService.DipsToPixels(3, NativeWindow.Dpi(this))) _orbDragging = true;
         if (!_orbDragging) return;
         var bounds = NativeWindow.Bounds(this);
         var screen = Forms.Screen.FromPoint(new System.Drawing.Point(cursor.X, cursor.Y));
-        var target = WindowSnapService.ClampToWorkArea(bounds with { X = cursor.X - _grabX * bounds.Width, Y = cursor.Y - _grabY * bounds.Height }, WorkArea(screen), 0);
+        var area = WorkArea(screen);
+        if (area.Width <= 0 || area.Height <= 0) return;
+        var target = WindowSnapService.ClampToWorkArea(bounds with { X = cursor.X - _grabX * bounds.Width, Y = cursor.Y - _grabY * bounds.Height }, area, 0);
         NativeWindow.Move(this, target.X, target.Y); e.Handled = true;
     }
     private void Orb_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -413,22 +420,24 @@ public partial class MainWindow : Window
     {
         StopSnap();
         var start = NativeWindow.Bounds(this);
-        var target = WindowSnapService.SnapToNearestEdge(start, WorkArea(CurrentScreen()), WindowSnapService.DipsToPixels(7, NativeWindow.Dpi(this)));
+        var area = WorkArea(CurrentScreen());
+        if (area.Width <= 0 || area.Height <= 0) return;
+        var target = WindowSnapService.SnapToNearestEdge(start, area, WindowSnapService.DipsToPixels(7, NativeWindow.Dpi(this)));
         if (animate && SystemParameters.ClientAreaAnimation)
         {
-            _motionStart = start; _motionTarget = target; _motionStarted = DateTime.UtcNow; _snapTimer.Start();
+            _motionStart = start; _motionTarget = target; _motionClock.Restart(); _snapTimer.Start();
         }
         else { NativeWindow.Move(this, target.X, target.Y); SavePosition(); }
     }
     private void TickSnap()
     {
         if (_motionStart is not {} start || _motionTarget is not {} target) { StopSnap(); return; }
-        var progress = Math.Clamp((DateTime.UtcNow - _motionStarted).TotalMilliseconds / 180, 0, 1);
+        var progress = Math.Clamp(_motionClock.Elapsed.TotalMilliseconds / 180, 0, 1);
         var eased = 1 - Math.Pow(1 - progress, 3);
         NativeWindow.Move(this, start.X + (target.X - start.X) * eased, start.Y + (target.Y - start.Y) * eased);
         if (progress >= 1) { StopSnap(); EnsureVisible(); SavePosition(); }
     }
-    private void StopSnap() { _snapTimer.Stop(); _motionTarget = null; _motionStart = null; }
+    private void StopSnap() { _snapTimer.Stop(); _motionClock.Stop(); _motionTarget = null; _motionStart = null; }
     private void RecoverWindow()
     {
         Show(); WindowState = WindowState.Normal; StopSnap(); EndOrbGesture(false);
@@ -461,7 +470,9 @@ public partial class MainWindow : Window
         var bounds = NativeWindow.Bounds(this);
         if (bounds.Width <= 0 || bounds.Height <= 0) return;
         var screen = CurrentScreen();
-        var placement = WindowSnapService.Capture(bounds, WorkArea(screen), screen.DeviceName);
+        var area = WorkArea(screen);
+        if (area.Width <= 0 || area.Height <= 0) return;
+        var placement = WindowSnapService.Capture(bounds, area, screen.DeviceName);
         _settings = _settings.IsMinimized && !_safeMode ? _settings with { OrbPlacement = placement } : _settings with { PanelPlacement = placement };
         _settings = _settings with { PlacementVersion = 2, Left = null, Top = null }; SaveSettings();
     }

@@ -3,7 +3,9 @@ namespace LiquidTodo.Core;
 
 public sealed record InstanceCommand(string Action, string? ImportPath = null)
 {
-    public string Serialize() => JsonSerializer.Serialize(this, LiquidTodoJson.Options);
+    // Named pipe protocol uses one JSON packet per physical line.
+    private static readonly JsonSerializerOptions PipeOptions = new(LiquidTodoJson.Options) { WriteIndented = false };
+    public string Serialize() => JsonSerializer.Serialize(this, PipeOptions);
     public static InstanceCommand Parse(string message)
     {
         // Older clients sent a single literal line; allow them to wake the window.

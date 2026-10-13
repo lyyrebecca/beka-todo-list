@@ -18,6 +18,9 @@ OutputBaseFilename=LiquidTodo-Windows-x64-Setup-v{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=lowest
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+MinVersion=10.0.19045
 UninstallDisplayIcon={app}\{#MyAppExeName}
 [Files]
 Source: "..\publish\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion

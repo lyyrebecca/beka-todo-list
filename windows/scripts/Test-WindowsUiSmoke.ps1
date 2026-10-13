@@ -250,6 +250,25 @@ try {
     $edited = (Read-Data).items[0]
     if ($edited.schedule.mode -ne 'Period' -or $edited.schedule.reminderTimeMinutes -ne 510 -or $edited.schedule.startDate -ne [DateTime]::Today.AddDays(2).ToString('yyyy-MM-dd')) { throw 'Edit dates/daily reminder did not persist.' }
 
+    Invoke-Button (Wait-ElementByName $main '编辑待办' ([System.Windows.Automation.ControlType]::Button))
+    $editor = Wait-WindowContainingElementId 'TodoTextBox'
+    Select-Combo $editor 'ModeInput' '某一天'
+    Set-Text (Wait-ElementById $editor 'DateInput') ([DateTime]::Today.AddDays(4).ToString('yyyy-MM-dd'))
+    (Wait-ElementById $editor 'TodoTextBox').SetFocus()
+    Select-Combo $editor 'ReminderInput' '到时提醒'
+    Set-Text (Wait-ElementById $editor 'TimeInput') '10:00'
+    Invoke-Button (Wait-ElementByName $editor '保存' ([System.Windows.Automation.ControlType]::Button))
+    $main = Wait-WindowContainingElementId 'AddTodoButton'
+    $day = (Read-Data).items[0]
+    if ($day.schedule.mode -ne 'Day' -or $day.schedule.reminderMode -ne 'AtTime' -or [DateTimeOffset]::Parse($day.schedule.date).LocalDateTime.Hour -ne 10) { throw 'Day mode editing did not persist.' }
+    Invoke-Button (Wait-ElementByName $main '编辑待办' ([System.Windows.Automation.ControlType]::Button))
+    $editor = Wait-WindowContainingElementId 'TodoTextBox'
+    Select-Combo $editor 'ModeInput' '无时间'
+    Invoke-Button (Wait-ElementByName $editor '保存' ([System.Windows.Automation.ControlType]::Button))
+    $main = Wait-WindowContainingElementId 'AddTodoButton'
+    $none = (Read-Data).items[0]
+    if ($none.schedule -and ($none.schedule.mode -ne 'None' -or $none.schedule.reminderMode -ne 'None')) { throw 'Clearing schedule did not persist.' }
+
     $importFile = Join-Path (Split-Path $exe) 'command import.json'
     @{schemaVersion=1;exportedAt=[DateTimeOffset]::UtcNow.ToString('o');items=@(@{id=[guid]::NewGuid().ToString();text='CLI 导入验收';createdAt=[DateTimeOffset]::UtcNow.ToString('o');priority='Normal';completed=$false});archived=@()} | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 $importFile
     $second = Start-Process $exe -ArgumentList @('--portable','--import',('"' + $importFile + '"')) -PassThru

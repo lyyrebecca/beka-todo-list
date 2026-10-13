@@ -12,7 +12,7 @@ internal static class NativeWindow
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hwnd);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int width, int height, uint flags);
-    public static Point CursorPosition() { GetCursorPos(out var point); return point; }
+    public static bool TryCursorPosition(out Point point) => GetCursorPos(out point);
     public static double Dpi(Window window) { var dpi = GetDpiForWindow(new WindowInteropHelper(window).Handle); return dpi > 0 ? dpi : 96; }
     public static LiquidTodo.Core.RectD Bounds(Window window)
     {
@@ -31,6 +31,7 @@ internal static class NativeWindow
         if (bounds.Width <= 0 || bounds.Height <= 0) return;
         var screen = System.Windows.Forms.Screen.FromHandle(new WindowInteropHelper(window).Handle);
         var work = screen.WorkingArea;
+        if (work.Width <= 0 || work.Height <= 0) return;
         var dpiScale = Dpi(window) / 96;
         if (bounds.Width > work.Width) window.Width = Math.Max(1, work.Width / dpiScale);
         if (bounds.Height > work.Height) window.Height = Math.Max(1, work.Height / dpiScale);

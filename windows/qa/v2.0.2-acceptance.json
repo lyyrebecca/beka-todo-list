@@ -4,7 +4,7 @@
   "automatedEvidence": "https://github.com/lyyrebecca/beka-todo-list/actions/runs/38371111800",
   "automatedEnvironment": "Windows Server 2025 Datacenter build 26100; 96 DPI; 1024x768",
   "checks": {
-    "unitTests": "72 passed locally; rerun in candidate pipeline",
+    "unitTests": "73 passed locally; rerun in candidate pipeline",
     "legacyMouseReproduction": "passed: v2.0.1 restored panel outside work area",
     "mouseCycles100": "passed: 100 cycles, 200 real mouse drags, no boundary or process failures",
     "installerAndPortableCandidate": "pending",

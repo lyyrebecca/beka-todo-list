@@ -17,6 +17,21 @@ jobs:
         with: { dotnet-version: 8.0.x }
       - run: dotnet test windows/LiquidTodo.Windows.sln -c Release --logger "trx;LogFileName=windows.trx" --results-directory evidence/unit-tests
       - run: dotnet publish windows/src/LiquidTodo.Windows -c Release -r win-x64 --self-contained true -p:DebugType=None -p:DebugSymbols=false -o windows/publish
+      - name: Verify released Microsoft UI tooling
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force evidence/tooling | Out-Null
+          gh release download v0.7.1 --repo microsoft/winappcli --pattern winappcli-x64.zip --dir "$env:RUNNER_TEMP/winapp-download"
+          $archive = "$env:RUNNER_TEMP/winapp-download/winappcli-x64.zip"
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'd925d1e32cdc320b6d271f653fd2cd3c05b5d7558deb20d1b548bead77900fcf') { throw 'UI tool release checksum mismatch.' }
+          Expand-Archive $archive "$env:RUNNER_TEMP/winapp-tool"
+          $tool = Get-ChildItem "$env:RUNNER_TEMP/winapp-tool" -Filter winapp.exe -Recurse | Select-Object -First 1
+          if (-not $tool) { throw 'Released winapp CLI binary missing.' }
+          "WINAPP_TOOL=$($tool.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          & $tool.FullName --version | Tee-Object evidence/tooling/version.txt
+          & $tool.FullName ui --help | Tee-Object evidence/tooling/ui-help.txt
       - name: Build and verify actual Setup and Portable candidate
         shell: pwsh
         run: |

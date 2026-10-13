@@ -77,6 +77,14 @@ public class PlacementAndReminderTests
         Assert.Equal("activate", InstanceCommand.Parse("malformed").Action);
     }
 
+    [Fact] public void Pipe_packet_is_exactly_one_physical_line()
+    {
+        var packet = new InstanceCommand("import", @"C:\backup folder\备份.json").Serialize();
+        Assert.DoesNotContain('\n', packet);
+        Assert.DoesNotContain('\r', packet);
+        Assert.Equal("import", InstanceCommand.Parse(packet.Split('\n')[0]).Action);
+    }
+
     [Fact] public void Polling_handles_far_future_and_delivers_once()
     {
         var start = DateTimeOffset.UtcNow; var id = Guid.NewGuid(); var at = start.AddDays(120);

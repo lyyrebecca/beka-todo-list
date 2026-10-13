@@ -26,8 +26,15 @@ $evidence = [IO.Path]::GetFullPath($EvidenceDirectory)
 New-Item -ItemType Directory -Force $evidence, (Join-Path $root 'Data') | Out-Null
 # Test only a fresh, isolated package extraction. Never point this at user data.
 $settingsPath = Join-Path $root 'Data\settings.json'
-if (Test-Path $settingsPath) { throw 'UI test requires a fresh extraction with no existing settings.' }
-@{ownerName='Window QA';isMinimized=$false;desktopMode=$false} | ConvertTo-Json | Set-Content -Encoding UTF8 $settingsPath
+$dataPath = Join-Path $root 'Data\data.json'
+if ((Test-Path $settingsPath) -or (Test-Path $dataPath)) { throw 'UI test requires a fresh extraction with no existing settings or data.' }
+@{ownerName='贝卡';isMinimized=$false;desktopMode=$false} | ConvertTo-Json | Set-Content -Encoding UTF8 $settingsPath
+$demoItems = @(
+    @{id=[guid]::NewGuid().ToString();text='把今天的一件事做好';createdAt=[DateTimeOffset]::UtcNow.ToString('o');priority='Important';completed=$false},
+    @{id=[guid]::NewGuid().ToString();text='整理本周计划';createdAt=[DateTimeOffset]::UtcNow.ToString('o');priority='Normal';completed=$false},
+    @{id=[guid]::NewGuid().ToString();text='散步，给自己一点空闲';createdAt=[DateTimeOffset]::UtcNow.ToString('o');priority='Normal';completed=$false}
+)
+@{items=$demoItems;archived=@()} | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 $dataPath
 $process = $null
 $recorder = $null
 $trace = [Collections.Generic.List[object]]::new()
@@ -140,6 +147,22 @@ try {
         Check-Visible $h 'restored'; Record 'restored' $h $cycle
         if($cycle -eq 1 -or $cycle -eq $Cycles) { Screenshot "panel-restored-$cycle" $h }
     }
+    # Drag empty header space with real mouse input, not a UIA invocation.
+    [OrbInput]::SetForegroundWindow($h) | Out-Null
+    $before=Bounds $h; $x=$before.Left+180; $y=$before.Top+20
+    [OrbInput]::SetCursorPos($x,$y) | Out-Null
+    [OrbInput]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
+    try {
+        Start-Sleep -Milliseconds 80
+        for($step=1;$step -le 6;$step++) {
+            [OrbInput]::SetCursorPos(($x-10*$step),($y+5*$step)) | Out-Null
+            Start-Sleep -Milliseconds 40
+        }
+    } finally { [OrbInput]::mouse_event(4,0,0,0,[UIntPtr]::Zero) }
+    Start-Sleep -Milliseconds 350
+    $after=Bounds $h
+    Check ([Math]::Abs($after.Left-$before.Left) -ge 40) 'Empty header drag did not move the panel.'
+    Check-Visible $h 'header-drag'; Record 'header-drag' $h $Cycles
     # A second launch must exit and leave the tested instance alive.
     $second=Start-Process $exe -ArgumentList '--portable','--diagnostics' -PassThru
     if(-not $second.WaitForExit(10000)) { Stop-Process $second.Id -Force; throw 'Second instance did not exit.' }
@@ -150,7 +173,7 @@ try {
         & $env:WINAPP_TOOL ui yield | Out-Null
     }
     $os=Get-CimInstance Win32_OperatingSystem
-    @{os=$os.Caption;build=$os.BuildNumber;cycles=$Cycles;legacy=$ExpectLegacyFailure.IsPresent;violations=@($violations.ToArray());dpi=[OrbInput]::GetDpiForWindow($h);videoRecorded=(Test-Path (Join-Path $evidence 'drag-recording.mp4'));status=if($ExpectLegacyFailure){'legacy-failure-reproduced'}else{'passed'};tests='Native mouse down/move/up, 2 drags per cycle, restore, bounds, process, second instance'} | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 (Join-Path $evidence 'summary.json')
+    @{os=$os.Caption;build=$os.BuildNumber;cycles=$Cycles;legacy=$ExpectLegacyFailure.IsPresent;violations=@($violations.ToArray());dpi=[OrbInput]::GetDpiForWindow($h);videoRecorded=($null -ne $recorder -and $recorder.HasExited -and $recorder.ExitCode -eq 0 -and (Test-Path (Join-Path $evidence 'drag-recording.mp4')));status=if($ExpectLegacyFailure){'legacy-failure-reproduced'}else{'passed'};tests='Native mouse down/move/up, 2 drags per cycle, restore, bounds, process, second instance'} | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 (Join-Path $evidence 'summary.json')
 }
 finally {
     $trace.ToArray() | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 (Join-Path $evidence 'window-trace.json')
