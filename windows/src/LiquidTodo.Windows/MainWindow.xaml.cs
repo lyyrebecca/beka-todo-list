@@ -159,6 +159,7 @@ public partial class MainWindow : Window
     }
     private void EnsureVisible()
     {
+        NativeWindow.FitToWorkArea(this);
         var bounds = NativeWindow.Bounds(this);
         if (bounds.Width <= 0 || bounds.Height <= 0) return;
         var area = WorkArea(CurrentScreen());
@@ -186,6 +187,7 @@ public partial class MainWindow : Window
         var source = showArchive ? _store.Archived : _store.Items;
         Title = $"{OwnerName}の Todo list";
         NameTitle.Text = $"{OwnerName}の Todo list";
+        NameTitle.ToolTip = Title;
         SubTitle.Text = showArchive ? $"已完成 {source.Count} 项" : _store.Items.Count == 0 ? "今天，把一件事做好" : $"还有 {_store.Items.Count} 项待办";
         ArchiveButton.Content = showArchive ? "‹" : "◷";
         if (source.Count == 0)
@@ -332,7 +334,8 @@ public partial class MainWindow : Window
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.LeftButton != MouseButtonState.Pressed || IsInsideButton(e.OriginalSource as DependencyObject)) return;
-        DragMove();
+        try { DragMove(); }
+        finally { EnsureVisible(); SavePosition(); }
     }
 
     private static bool IsInsideButton(DependencyObject? source)
@@ -468,5 +471,5 @@ public partial class MainWindow : Window
         if (!_ready) return;
         _positionSaveTimer.Stop(); _positionSaveTimer.Start();
     }
-    protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e) { if (e.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control) { StartAdd(); e.Handled = true; } base.OnKeyDown(e); }
+    protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e) { if (e.Key == Key.Escape && _orbPressed) { EndOrbGesture(true); e.Handled = true; } if (e.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control) { StartAdd(); e.Handled = true; } base.OnKeyDown(e); }
 }

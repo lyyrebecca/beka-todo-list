@@ -25,6 +25,19 @@ internal static class NativeWindow
         if (!SetWindowPos(new WindowInteropHelper(window).Handle, IntPtr.Zero, (int)Math.Round(x), (int)Math.Round(y), 0, 0, 0x0015))
             throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
     }
+    public static void FitToWorkArea(Window window)
+    {
+        var bounds = Bounds(window);
+        if (bounds.Width <= 0 || bounds.Height <= 0) return;
+        var screen = System.Windows.Forms.Screen.FromHandle(new WindowInteropHelper(window).Handle);
+        var work = screen.WorkingArea;
+        var dpiScale = Dpi(window) / 96;
+        if (bounds.Width > work.Width) window.Width = Math.Max(1, work.Width / dpiScale);
+        if (bounds.Height > work.Height) window.Height = Math.Max(1, work.Height / dpiScale);
+        window.UpdateLayout();
+        var target = LiquidTodo.Core.WindowSnapService.ClampToWorkArea(Bounds(window), new(work.Left, work.Top, work.Width, work.Height), 0);
+        Move(window, target.X, target.Y);
+    }
 
     private const int GwlExStyle = -20;
     private const int WsExTransparent = 0x20;

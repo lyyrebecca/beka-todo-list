@@ -15,7 +15,7 @@
     <Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="*"/><RowDefinition Height="42"/></Grid.RowDefinitions>
     <Grid Grid.Row="0" MouseLeftButtonDown="Header_MouseLeftButtonDown">
      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="160"/></Grid.ColumnDefinitions>
-    <StackPanel><TextBlock x:Name="NameTitle" Text="贝卡の Todo list" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource Ink}"/><TextBlock x:Name="SubTitle" Text="今天，把一件事做好" FontSize="11" Foreground="{DynamicResource Muted}" Margin="0,2,0,0"/></StackPanel>
+    <StackPanel><TextBlock x:Name="NameTitle" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Text="贝卡の Todo list" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource Ink}"/><TextBlock x:Name="SubTitle" Text="今天，把一件事做好" FontSize="11" Foreground="{DynamicResource Muted}" Margin="0,2,0,0"/></StackPanel>
      <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
       <Button x:Name="ArchiveButton" Style="{StaticResource HeaderButton}" ToolTip="完成历史" Click="ArchiveButton_Click" Content="◷"/>
       <Button Style="{StaticResource HeaderButton}" ToolTip="自定义待办名称" Click="CustomizeNameButton_Click" Content="⚙"/>

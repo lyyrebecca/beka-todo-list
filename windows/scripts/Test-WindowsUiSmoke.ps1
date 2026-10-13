@@ -96,7 +96,14 @@ function Invoke-Button($element) {
 }
 
 function Set-Text($element, [string]$value) {
-    $pattern = $element.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+    $pattern = $null
+    if (-not $element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) {
+        $condition = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
+        $edit = $element.FindFirst($script:descendants, $condition)
+        if (-not $edit -or -not $edit.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) { throw "No editable ValuePattern for $($element.Current.AutomationId) / $($element.Current.ClassName)." }
+        $element = $edit
+    }
+    $element.SetFocus()
     if ($pattern.Current.IsReadOnly) { throw "Text field '$($element.Current.AutomationId)' is read-only." }
     $pattern.SetValue($value)
 }
@@ -170,6 +177,7 @@ try {
     Select-Combo $editor 'PriorityInput' '重要 🌟'
     Select-Combo $editor 'ModeInput' '截止日期'
     Set-Text (Wait-ElementById $editor 'DateInput') ([DateTime]::Today.AddDays(5).ToString('yyyy-MM-dd'))
+    (Wait-ElementById $editor 'TodoTextBox').SetFocus()
     Set-Text (Wait-ElementById $editor 'TimeInput') '22:15'
     Select-Combo $editor 'ReminderInput' '提前一天'
     Set-Text (Wait-ElementById $editor 'ReminderTimeInput') '21:00'
@@ -184,7 +192,9 @@ try {
     Set-Text (Wait-ElementById $editor 'TodoTextBox') 'Windows 中文输入编辑完成'
     Select-Combo $editor 'ModeInput' '期间'
     Set-Text (Wait-ElementById $editor 'StartInput') ([DateTime]::Today.AddDays(2).ToString('yyyy-MM-dd'))
+    (Wait-ElementById $editor 'TodoTextBox').SetFocus()
     Set-Text (Wait-ElementById $editor 'EndInput') ([DateTime]::Today.AddDays(8).ToString('yyyy-MM-dd'))
+    (Wait-ElementById $editor 'TodoTextBox').SetFocus()
     Set-Text (Wait-ElementById $editor 'ReminderTimeInput') '08:30'
     Invoke-Button (Wait-ElementByName $editor '保存' ([System.Windows.Automation.ControlType]::Button))
     $main = Wait-WindowContainingElementId 'AddTodoButton'
@@ -222,6 +232,13 @@ try {
     Wait-Text $main 'Windows 中文输入编辑完成'
 
     Write-Host 'Windows UI smoke passed: naming, Unicode text, priority, date/deadline creation, period/daily editing, second-launch import, completion undo and persistence. This is not an IME composition test.'
+}
+catch {
+    Write-Host $_.ScriptStackTrace
+    Write-Host $_.Exception.ToString()
+    $logRoot = Join-Path (Split-Path $exe) 'Data\Logs'
+    Get-ChildItem $logRoot -Filter 'startup-*.log' -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName }
+    throw
 }
 finally {
     if ($process -and -not $process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
