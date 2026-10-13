@@ -69,6 +69,13 @@ function Screenshot([string]$name,[IntPtr]$h) {
     $graphics=[Drawing.Graphics]::FromImage($bitmap)
     try { $graphics.CopyFromScreen($screen.Location,[Drawing.Point]::Empty,$screen.Size); $bitmap.Save((Join-Path $evidence "$name.png"),[Drawing.Imaging.ImageFormat]::Png) }
     finally { $graphics.Dispose(); $bitmap.Dispose() }
+    if ($name -like 'panel-*') {
+        $r=Bounds $h
+        $windowBitmap=[Drawing.Bitmap]::new(($r.Right-$r.Left),($r.Bottom-$r.Top))
+        $g=[Drawing.Graphics]::FromImage($windowBitmap)
+        try { $g.CopyFromScreen([Drawing.Point]::new($r.Left,$r.Top),[Drawing.Point]::Empty,$windowBitmap.Size); $windowBitmap.Save((Join-Path $evidence "$name-window.png"),[Drawing.Imaging.ImageFormat]::Png) }
+        finally { $g.Dispose(); $windowBitmap.Dispose() }
+    }
 }
 function Check([bool]$condition,[string]$message) {
     if (-not $condition) { $violations.Add($message); if(-not $ExpectLegacyFailure) { throw $message } }

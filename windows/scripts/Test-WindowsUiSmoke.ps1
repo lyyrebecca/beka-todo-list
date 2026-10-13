@@ -3,6 +3,16 @@
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class UiPointer {
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint f, uint x, uint y, uint d, UIntPtr e);
+  [DllImport("user32.dll")] public static extern IntPtr SetProcessDpiAwarenessContext(IntPtr c);
+}
+'@
+[UiPointer]::SetProcessDpiAwarenessContext([IntPtr](-4)) | Out-Null
 
 $exe = (Resolve-Path -LiteralPath $ExecutablePath).Path
 $root = [System.Windows.Automation.AutomationElement]::RootElement
@@ -115,9 +125,28 @@ function Select-Combo($window, [string]$id, [string]$itemName) {
         [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty, $itemName),
         [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem),
         [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $script:process.Id))
-    $item = $script:root.FindFirst($script:descendants, $condition)
-    if (-not $item) { throw "Combo item '$itemName' was not exposed." }
-    $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+    $item = $null
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    do {
+        $matches = $script:root.FindAll($script:descendants, $condition)
+        for ($i=0; $i -lt $matches.Count; $i++) {
+            $candidate = $matches.Item($i)
+            if (-not $candidate.Current.IsOffscreen -and $candidate.Current.BoundingRectangle.Width -gt 0) { $item=$candidate; break }
+        }
+        if (-not $item) { Start-Sleep -Milliseconds 100 }
+    } while (-not $item -and $timer.Elapsed.TotalSeconds -lt 5)
+    if (-not $item) { throw "Combo item '$itemName' was not exposed on screen." }
+    $pattern = $null
+    if ($item.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern,[ref]$pattern)) { $pattern.Select() }
+    else {
+        # Explicit XAML ComboBoxItem peers do not always expose SelectionItem.
+        # Click the observed popup item and verify persisted values afterwards.
+        $rect=$item.Current.BoundingRectangle
+        [UiPointer]::SetCursorPos([int]($rect.X+$rect.Width/2),[int]($rect.Y+$rect.Height/2)) | Out-Null
+        [UiPointer]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
+        [UiPointer]::mouse_event(4,0,0,0,[UIntPtr]::Zero)
+        Start-Sleep -Milliseconds 100
+    }
     $combo.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Collapse()
 }
 function Read-Data { Get-Content -LiteralPath (Join-Path (Split-Path $exe) 'Data\data.json') -Raw | ConvertFrom-Json }
