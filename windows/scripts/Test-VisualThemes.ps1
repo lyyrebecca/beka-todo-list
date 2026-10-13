@@ -76,7 +76,7 @@ function Screenshot([string]$name,[IntPtr]$h) {
 }
 try {
  Apply-TestTheme $false
- $backdrop=[Windows.Forms.Form]::new();$backdrop.FormBorderStyle='None';$backdrop.ShowInTaskbar=$false
+ $backdrop=[Windows.Forms.Form]::new();$backdrop.FormBorderStyle='None';$backdrop.ShowInTaskbar=$false;$backdrop.StartPosition='Manual';$backdrop.TopMost=$true
  $backdrop.Bounds=[Windows.Forms.Screen]::PrimaryScreen.Bounds;$backdrop.BackColor=[Drawing.Color]::FromArgb(222,217,229)
  $backdrop.Show();[Windows.Forms.Application]::DoEvents()
  $process=Start-Process $exe -ArgumentList '--portable','--diagnostics' -PassThru
@@ -84,9 +84,10 @@ try {
   Apply-TestTheme $dark
   $label=if($dark){'夜间 · 烟紫玻璃'}else{'白天 · 轻雾紫'}
   $w=Wait-Theme $label;$h=[IntPtr]$w.Current.NativeWindowHandle
-  [ThemeNative]::SetForegroundWindow($h) | Out-Null
   $backdrop.BackColor=if($dark){[Drawing.Color]::FromArgb(48,42,58)}else{[Drawing.Color]::FromArgb(222,217,229)}
-  [Windows.Forms.Application]::DoEvents();Start-Sleep -Milliseconds 350
+  $backdrop.BringToFront();$backdrop.Refresh();[Windows.Forms.Application]::DoEvents()
+  [ThemeNative]::SetForegroundWindow($h) | Out-Null
+  Start-Sleep -Milliseconds 350
   $name=if($dark){'night'}else{'day'}
   Screenshot "$name-panel" $h
   $id=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::AutomationIdProperty,'MinimizeButton')

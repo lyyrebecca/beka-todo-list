@@ -206,7 +206,7 @@ public partial class MainWindow : Window
         }
         AddButton.Visibility = showArchive ? Visibility.Collapsed : Visibility.Visible;
         var visibleCount = showArchive ? Math.Min(7, source.Count) : Math.Min(_showAllItems ? 8 : 10, source.Count);
-        AnimateTo(PanelWidth, Math.Max(190, Math.Min(640, 150 + visibleCount * 48 + (showArchive ? 48 : 42))), false);
+        AnimateTo(PanelWidth, Math.Max(190, Math.Min(640, 130 + visibleCount * 42 + (showArchive ? 25 : 0))), false);
         _toasts?.Rebuild();
     }
 

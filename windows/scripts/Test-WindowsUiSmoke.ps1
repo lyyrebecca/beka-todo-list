@@ -193,6 +193,14 @@ function Wait-DialogButton([string]$message, [string]$id) {
             $dialog=[System.Windows.Automation.TreeWalker]::RawViewWalker.GetParent($text)
             $button=Find-ElementById $dialog $id
             if($button -and -not $button.Current.IsOffscreen){return $button}
+            # Modern native dialog providers sometimes expose OK as id=2.
+            # Match its observed localized role, never an arbitrary Pane.
+            $names=switch($id){'1'{@('OK','确定','确定(O)','&OK')};'6'{@('Yes','是','是(Y)','&Yes')};'7'{@('No','否','否(N)','&No')}}
+            $controls=$dialog.FindAll($script:descendants,$script:all)
+            for($j=0;$j -lt $controls.Count;$j++){
+                $candidate=$controls.Item($j)
+                if(-not $candidate.Current.IsOffscreen -and $candidate.Current.Name -in $names){return $candidate}
+            }
         }
         Start-Sleep -Milliseconds 100
     } while($clock.Elapsed.TotalSeconds -lt 10)
