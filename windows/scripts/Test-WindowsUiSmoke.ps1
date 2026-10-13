@@ -219,6 +219,15 @@ function Wait-ProcessMenu([string]$name) {
     }while($clock.Elapsed.TotalSeconds -lt 10)
     throw "Menu '$name' not found."
 }
+function Wait-DataState([scriptblock]$predicate,[string]$label) {
+    $clock=[Diagnostics.Stopwatch]::StartNew()
+    do {
+        $data=Read-Data
+        if(& $predicate $data){return}
+        Start-Sleep -Milliseconds 100
+    }while($clock.Elapsed.TotalSeconds -lt 10)
+    throw "Persisted state did not reach: $label"
+}
 function Read-Data { Get-Content -LiteralPath (Join-Path (Split-Path $exe) 'Data\data.json') -Raw | ConvertFrom-Json }
 
 function Wait-Text($window, [string]$value, [bool]$shouldExist = $true, [int]$timeoutSeconds = 10) {
@@ -364,18 +373,18 @@ try {
         }
     }finally{[UiPointer]::mouse_event(4,0,0,0,[UIntPtr]::Zero)}
     Start-Sleep -Milliseconds 300
-    if((Read-Data).items[1].text -ne '排序回归条目'){throw 'Real handle dragging did not persist order.'}
+    Wait-DataState {param($d) $d.items[1].text -eq '排序回归条目'} 'real handle drag order'
 
     # Let the four-second completion timer actually expire, then restore history.
     $main=Wait-WindowContainingElementId 'AddTodoButton'
     $checkCondition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::CheckBox)
     $main.FindFirst($script:descendants,$checkCondition).GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
     Start-Sleep -Milliseconds 4500
-    if((Read-Data).archived.Count -ne 1){throw 'Four-second archive did not complete.'}
+    Wait-DataState {param($d) $d.archived.Count -eq 1} 'four-second archive'
     Invoke-Button (Wait-ElementById $main 'ArchiveButton')
     $main=Wait-WindowContainingElementId 'NameTitle'
     Invoke-Button (Wait-ElementByName $main '恢复' ([System.Windows.Automation.ControlType]::Button))
-    if((Read-Data).archived.Count -ne 0){throw 'History restore did not persist.'}
+    Wait-DataState {param($d) $d.archived.Count -eq 0 -and $d.items.text -contains 'Windows 中文输入编辑完成'} 'history restore'
     Invoke-Button (Wait-ElementById $main 'ArchiveButton')
     $main=Wait-WindowContainingElementId 'AddTodoButton'
     Wait-Text $main 'Windows 中文输入编辑完成'
@@ -386,7 +395,7 @@ try {
     [UiPointer]::SetCursorPos([int]($r.X+$r.Width/2),[int]($r.Y+$r.Height/2)) | Out-Null
     [UiPointer]::mouse_event(8,0,0,0,[UIntPtr]::Zero);[UiPointer]::mouse_event(16,0,0,0,[UIntPtr]::Zero)
     Invoke-Button (Wait-ProcessMenu '删除')
-    if((Read-Data).items.text -contains 'CLI 导入验收'){throw 'Context menu delete did not persist.'}
+    Wait-DataState {param($d) $d.items.text -notcontains 'CLI 导入验收'} 'context menu delete'
 
     # Complete the remaining normal row and clear archive with explicit confirmation.
     $main=Wait-WindowContainingElementId 'AddTodoButton'
@@ -397,7 +406,7 @@ try {
     $main=Wait-WindowContainingElementId 'NameTitle'
     Invoke-Button (Wait-ElementByName $main '清空全部已完成' ([System.Windows.Automation.ControlType]::Button))
     Invoke-Button (Wait-DialogButton '确定清空全部已完成事项？' '6')
-    if((Read-Data).archived.Count -ne 0){throw 'Archive clear did not persist.'}
+    Wait-DataState {param($d) $d.archived.Count -eq 0} 'archive clear'
     Invoke-Button (Wait-ElementById $main 'ArchiveButton')
 
     Stop-Process -Id $process.Id -Force
