@@ -3,6 +3,7 @@
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type -AssemblyName System.Windows.Forms
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
@@ -179,6 +180,37 @@ function Wait-MergeButton {
     } while($timer.Elapsed.TotalSeconds -lt 15)
     throw 'CLI import confirmation merge/No button did not appear.'
 }
+function Wait-DialogButton([string]$message, [string]$id) {
+    $clock=[Diagnostics.Stopwatch]::StartNew()
+    do {
+        $windows=$script:root.FindAll($script:children,$script:all)
+        for($i=0;$i -lt $windows.Count;$i++) {
+            $w=$windows.Item($i)
+            if($w.Current.ProcessId -ne $script:process.Id) { continue }
+            $textCondition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,$message)
+            $text=$w.FindFirst($script:descendants,$textCondition)
+            if(-not $text){continue}
+            $dialog=[System.Windows.Automation.TreeWalker]::RawViewWalker.GetParent($text)
+            $button=Find-ElementById $dialog $id
+            if($button -and -not $button.Current.IsOffscreen){return $button}
+        }
+        Start-Sleep -Milliseconds 100
+    } while($clock.Elapsed.TotalSeconds -lt 10)
+    throw "Confirmation button $id for '$message' not found."
+}
+function Wait-ProcessMenu([string]$name) {
+    $condition=[System.Windows.Automation.AndCondition]::new(
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty,$script:process.Id),
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,$name),
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::MenuItem))
+    $clock=[Diagnostics.Stopwatch]::StartNew()
+    do {
+        $e=$script:root.FindFirst($script:descendants,$condition)
+        if($e -and -not $e.Current.IsOffscreen){return $e}
+        Start-Sleep -Milliseconds 100
+    }while($clock.Elapsed.TotalSeconds -lt 10)
+    throw "Menu '$name' not found."
+}
 function Read-Data { Get-Content -LiteralPath (Join-Path (Split-Path $exe) 'Data\data.json') -Raw | ConvertFrom-Json }
 
 function Wait-Text($window, [string]$value, [bool]$shouldExist = $true, [int]$timeoutSeconds = 10) {
@@ -300,6 +332,66 @@ try {
     $main = Wait-WindowContainingElementId 'AddTodoButton'
     Wait-Text $main 'Windows 中文输入编辑完成'
 
+    # Ctrl+N, whitespace validation, and actual handle dragging (not model calls).
+    [System.Windows.Forms.SendKeys]::SendWait('^n')
+    $editor=Wait-WindowContainingElementId 'TodoTextBox'
+    Set-Text (Wait-ElementById $editor 'TodoTextBox') '   '
+    Invoke-Button (Wait-ElementByName $editor '保存' ([System.Windows.Automation.ControlType]::Button))
+    Invoke-Button (Wait-DialogButton '待办内容不能为空。' '1')
+    if((Read-Data).items.Count -ne 2){throw 'Whitespace todo was incorrectly created.'}
+    Set-Text (Wait-ElementById $editor 'TodoTextBox') '排序回归条目'
+    Invoke-Button (Wait-ElementByName $editor '保存' ([System.Windows.Automation.ControlType]::Button))
+    $main=Wait-WindowContainingElementId 'AddTodoButton'
+    Wait-Text $main '排序回归条目'
+    $thumbCondition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Thumb)
+    $handles=$main.FindAll($script:descendants,$thumbCondition)
+    if($handles.Count -ne 3){throw 'Expected three draggable row handles.'}
+    $source=$handles.Item(2).Current.BoundingRectangle;$target=$handles.Item(1).Current.BoundingRectangle
+    $x=[int]($source.X+$source.Width/2);$y=[int]($source.Y+$source.Height/2);$dest=[int]($target.Y+2)
+    [UiPointer]::SetCursorPos($x,$y) | Out-Null;[UiPointer]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
+    try {
+        for($step=1;$step -le 8;$step++){
+            [UiPointer]::SetCursorPos($x,($y+[int](($dest-$y)*$step/8))) | Out-Null
+            Start-Sleep -Milliseconds 40
+        }
+    }finally{[UiPointer]::mouse_event(4,0,0,0,[UIntPtr]::Zero)}
+    Start-Sleep -Milliseconds 300
+    if((Read-Data).items[1].text -ne '排序回归条目'){throw 'Real handle dragging did not persist order.'}
+
+    # Let the four-second completion timer actually expire, then restore history.
+    $main=Wait-WindowContainingElementId 'AddTodoButton'
+    $checkCondition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::CheckBox)
+    $main.FindFirst($script:descendants,$checkCondition).GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+    Start-Sleep -Milliseconds 4500
+    if((Read-Data).archived.Count -ne 1){throw 'Four-second archive did not complete.'}
+    Invoke-Button (Wait-ElementById $main 'ArchiveButton')
+    $main=Wait-WindowContainingElementId 'NameTitle'
+    Invoke-Button (Wait-ElementByName $main '恢复' ([System.Windows.Automation.ControlType]::Button))
+    if((Read-Data).archived.Count -ne 0){throw 'History restore did not persist.'}
+    Invoke-Button (Wait-ElementById $main 'ArchiveButton')
+    $main=Wait-WindowContainingElementId 'AddTodoButton'
+    Wait-Text $main 'Windows 中文输入编辑完成'
+
+    # Delete a real row through its context menu.
+    $text=Wait-ElementByName $main 'CLI 导入验收' ([System.Windows.Automation.ControlType]::Text)
+    $r=$text.Current.BoundingRectangle
+    [UiPointer]::SetCursorPos([int]($r.X+$r.Width/2),[int]($r.Y+$r.Height/2)) | Out-Null
+    [UiPointer]::mouse_event(8,0,0,0,[UIntPtr]::Zero);[UiPointer]::mouse_event(16,0,0,0,[UIntPtr]::Zero)
+    Invoke-Button (Wait-ProcessMenu '删除')
+    if((Read-Data).items.text -contains 'CLI 导入验收'){throw 'Context menu delete did not persist.'}
+
+    # Complete the remaining normal row and clear archive with explicit confirmation.
+    $main=Wait-WindowContainingElementId 'AddTodoButton'
+    $checks=$main.FindAll($script:descendants,$checkCondition)
+    $checks.Item(1).GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+    Start-Sleep -Milliseconds 4500
+    Invoke-Button (Wait-ElementById $main 'ArchiveButton')
+    $main=Wait-WindowContainingElementId 'NameTitle'
+    Invoke-Button (Wait-ElementByName $main '清空全部已完成' ([System.Windows.Automation.ControlType]::Button))
+    Invoke-Button (Wait-DialogButton '确定清空全部已完成事项？' '6')
+    if((Read-Data).archived.Count -ne 0){throw 'Archive clear did not persist.'}
+    Invoke-Button (Wait-ElementById $main 'ArchiveButton')
+
     Stop-Process -Id $process.Id -Force
     $process = $null
     Start-Sleep -Seconds 1
@@ -308,7 +400,7 @@ try {
     $main = Wait-WindowContainingElementId 'AddTodoButton'
     Wait-Text $main 'Windows 中文输入编辑完成'
 
-    Write-Host 'Windows UI smoke passed: naming, Unicode text, priority, date/deadline creation, period/daily editing, second-launch import, completion undo and persistence. This is not an IME composition test.'
+    Write-Host 'Windows UI smoke passed: naming, Unicode text, priority, date/deadline creation, period/daily editing, second-launch import, completion undo, real handle dragging, archive restore/clear, context deletion, Ctrl+N, blank validation and persistence. This is not an IME composition test.'
 }
 catch {
     Write-Host $_.ScriptStackTrace
