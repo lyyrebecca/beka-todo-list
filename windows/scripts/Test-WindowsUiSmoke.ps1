@@ -351,7 +351,7 @@ try {
     Invoke-Button (Wait-ElementByName $editor '保存' ([System.Windows.Automation.ControlType]::Button))
     $main=Wait-WindowContainingElementId 'AddTodoButton'
     Wait-Text $main '排序回归条目'
-    $thumbCondition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Thumb)
+    $thumbCondition=[System.Windows.Automation.AndCondition]::new([System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::Thumb),[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,'拖动调整顺序'))
     $handles=$main.FindAll($script:descendants,$thumbCondition)
     if($handles.Count -ne 3){throw 'Expected three draggable row handles.'}
     $source=$handles.Item(2).Current.BoundingRectangle;$target=$handles.Item(1).Current.BoundingRectangle

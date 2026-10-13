@@ -206,7 +206,7 @@ public partial class MainWindow : Window
         }
         AddButton.Visibility = showArchive ? Visibility.Collapsed : Visibility.Visible;
         var visibleCount = showArchive ? Math.Min(7, source.Count) : Math.Min(_showAllItems ? 8 : 10, source.Count);
-        AnimateTo(PanelWidth, Math.Max(190, Math.Min(640, 130 + visibleCount * 42 + (showArchive ? 25 : 0))), false);
+        AnimateTo(PanelWidth, Math.Max(190, Math.Min(640, 130 + visibleCount * 46 + (showArchive ? 25 : 0))), false);
         _toasts?.Rebuild();
     }
 
@@ -231,6 +231,8 @@ public partial class MainWindow : Window
         System.Windows.Automation.AutomationProperties.SetName(edit, "编辑待办");
         edit.Click += (_, _) => Edit(item); Grid.SetColumn(edit, 4); grid.Children.Add(edit);
         var handle = new Thumb { Width = 18, Height = 28, Cursor = Cursors.SizeAll, ToolTip = "拖动调整顺序", Opacity = .65, Template = CreateHandleTemplate() };
+        System.Windows.Automation.AutomationProperties.SetName(handle, "拖动调整顺序");
+        System.Windows.Automation.AutomationProperties.SetAutomationId(handle, $"Reorder_{item.Id:N}");
         handle.DragStarted += (_, _) => row.Opacity = .72;
         handle.DragCompleted += (_, _) => { row.Opacity = 1; MoveFromHandle(item.Id, Mouse.GetPosition(ItemsHost)); };
         Grid.SetColumn(handle, 5); grid.Children.Add(handle);
