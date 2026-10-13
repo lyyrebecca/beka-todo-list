@@ -13,6 +13,7 @@ public static class ThemeNative {
  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left,Top,Right,Bottom; }
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out RECT r);
  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+ [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h,IntPtr after,int x,int y,int w,int height,uint flags);
  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
  [DllImport("user32.dll")] public static extern void mouse_event(uint f,uint x,uint y,uint d,UIntPtr e);
  [DllImport("user32.dll")] public static extern IntPtr SetProcessDpiAwarenessContext(IntPtr c);
@@ -66,6 +67,12 @@ function Screenshot([string]$name,[IntPtr]$h) {
  try {
   $g.CopyFromScreen([Drawing.Point]::new($r.Left,$r.Top),[Drawing.Point]::Empty,$b.Size)
   $b.Save((Join-Path $evidence "$name.png"),[Drawing.Imaging.ImageFormat]::Png)
+  if($name -like '*panel*') {
+   $sample=$b.GetPixel(160,60)
+   if($sample.B-$sample.G -lt 18 -or $sample.R-$sample.G -lt 8){throw 'Captured reading plane is not the approved purple material, or was obscured.'}
+   if($name -like 'night*' -and $sample.G -gt 130){throw 'Night plane is too bright or did not switch.'}
+   if($name -like 'day*' -and ($sample.G -lt 155 -or $sample.G -gt 215)){throw 'Day plane is too bright/dark or did not switch.'}
+  }
   if($name -like '*orb*') {
    foreach($p in @(@(0,0),@(($b.Width-1),0),@(0,($b.Height-1)),@(($b.Width-1),($b.Height-1)))) {
     $c=$b.GetPixel($p[0],$p[1]);$bg=$backdrop.BackColor
@@ -86,6 +93,7 @@ try {
   $w=Wait-Theme $label;$h=[IntPtr]$w.Current.NativeWindowHandle
   $backdrop.BackColor=if($dark){[Drawing.Color]::FromArgb(48,42,58)}else{[Drawing.Color]::FromArgb(222,217,229)}
   $backdrop.BringToFront();$backdrop.Refresh();[Windows.Forms.Application]::DoEvents()
+  [ThemeNative]::SetWindowPos($h,[IntPtr](-1),0,0,0,0,0x13) | Out-Null
   [ThemeNative]::SetForegroundWindow($h) | Out-Null
   Start-Sleep -Milliseconds 350
   $name=if($dark){'night'}else{'day'}
