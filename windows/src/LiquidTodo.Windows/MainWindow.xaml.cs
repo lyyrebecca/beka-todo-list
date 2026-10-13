@@ -39,13 +39,14 @@ public partial class MainWindow : Window
     private bool _orbDragging;
     private bool _ready;
     private bool _showAllItems;
+    private HwndSource? _themeSource;
 
     public MainWindow(LiquidTodoPaths paths, TodoStore store, string[] arguments, bool safeMode = false)
     {
         InitializeComponent();
         _paths = paths; _store = store; _safeMode = safeMode; _settingsService = new SettingsService(paths.SettingsFile); _settings = _settingsService.Load();
-        InitializeGlassBackground();
         ApplyTheme();
+        SourceInitialized += (_, _) => { _themeSource = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle); _themeSource?.AddHook(ThemeMessage); };
         SystemEvents.UserPreferenceChanged += SystemPreferenceChanged;
         SystemEvents.DisplaySettingsChanged += DisplaySettingsChanged;
         SystemEvents.PowerModeChanged += PowerModeChanged;
@@ -77,33 +78,27 @@ public partial class MainWindow : Window
             _ready = true;
         };
         Closing += (_, _) => { _positionSaveTimer.Stop(); StopSnap(); if (_ready) SavePosition(); _ready = false; };
-        Closed += (_, _) => { _positionSaveTimer.Stop(); _snapTimer.Stop(); SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged; SystemEvents.PowerModeChanged -= PowerModeChanged; SystemEvents.UserPreferenceChanged -= SystemPreferenceChanged; _toasts?.Dispose(); _tray?.Dispose(); foreach (var timer in _undoTimers.Values) timer.Stop(); };
-    }
-
-    private void InitializeGlassBackground()
-    {
-        var path = Path.Combine(AppContext.BaseDirectory, "Assets", "LiquidGlassPanel.png");
-        if (!File.Exists(path)) return;
-        try
-        {
-            var image = new BitmapImage();
-            image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.UriSource = new Uri(path); image.EndInit(); image.Freeze();
-            GlassImageLayer.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill, Opacity = .9 };
-        }
-        catch { GlassImageLayer.Background = new SolidColorBrush(Color.FromRgb(238, 233, 255)); }
+        Closed += (_, _) => { _themeSource?.RemoveHook(ThemeMessage); _positionSaveTimer.Stop(); _snapTimer.Stop(); SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged; SystemEvents.PowerModeChanged -= PowerModeChanged; SystemEvents.UserPreferenceChanged -= SystemPreferenceChanged; _toasts?.Dispose(); _tray?.Dispose(); foreach (var timer in _undoTimers.Values) timer.Stop(); };
     }
 
     private void ApplyTheme()
     {
         var darkMode = WindowsThemeService.IsDarkMode();
         WindowsThemeService.ApplyResources(darkMode);
-        if (GlassImageLayer.Background is ImageBrush imageBrush) imageBrush.Opacity = darkMode ? .48 : .92;
+        GlassSurface.SetTheme(darkMode);
+        System.Windows.Automation.AutomationProperties.SetItemStatus(this, AppearancePalette.For(darkMode).Name);
     }
 
     private void SystemPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
     {
-        if (e.Category is not (UserPreferenceCategory.General or UserPreferenceCategory.Color)) return;
-        Dispatcher.BeginInvoke(new Action(ApplyTheme));
+        if (_ready) Dispatcher.BeginInvoke(new Action(ApplyTheme));
+    }
+    private IntPtr ThemeMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        // Windows broadcasts both messages for app-theme changes. Do not rely on
+        // a particular SystemEvents preference category from different OS builds.
+        if (_ready && message is 0x001A or 0x031A) Dispatcher.BeginInvoke(new Action(ApplyTheme));
+        return IntPtr.Zero;
     }
 
     public void ActivateFromSecondLaunch(string command)
@@ -200,7 +195,7 @@ public partial class MainWindow : Window
         foreach (var item in source.Take(limit)) ItemsHost.Children.Add(showArchive ? CreateArchiveRow(item) : CreateTodoRow(item));
         if (!showArchive && source.Count > 10)
         {
-            var toggle = new Button { Content = _showAllItems ? "⌃  收起" : $"⌄  还有 {source.Count - 10} 条", Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = (Brush)FindResource("Purple"), Padding = new Thickness(8, 6, 8, 6), HorizontalContentAlignment = System.Windows.HorizontalAlignment.Left, Cursor = Cursors.Hand };
+            var toggle = new Button { Content = _showAllItems ? "⌃  收起" : $"⌄  还有 {source.Count - 10} 条", Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = (Brush)FindResource("AccentText"), Padding = new Thickness(8, 6, 8, 6), HorizontalContentAlignment = System.Windows.HorizontalAlignment.Left, Cursor = Cursors.Hand };
             toggle.Click += (_, _) => { _showAllItems = !_showAllItems; Render(); };
             ItemsHost.Children.Add(toggle);
         }
@@ -230,7 +225,7 @@ public partial class MainWindow : Window
         }
         var text = new TextBlock { Text = item.Text, Foreground = item.Completed ? (Brush)FindResource("Muted") : (Brush)FindResource("Ink"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, Cursor = Cursors.Hand, TextDecorations = item.Completed ? TextDecorations.Strikethrough : null };
         text.MouseLeftButtonUp += (_, _) => Edit(item); Grid.SetColumn(text, 2); grid.Children.Add(text);
-        var label = new TextBlock { Text = LabelFor(item), Foreground = IsOverdue(item) ? (Brush)FindResource("Urgent") : (Brush)FindResource("Purple"), FontSize = 10, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Right, TextTrimming = TextTrimming.CharacterEllipsis };
+        var label = new TextBlock { Text = LabelFor(item), Foreground = IsOverdue(item) ? (Brush)FindResource("Urgent") : (Brush)FindResource("AccentText"), FontSize = 10, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Right, TextTrimming = TextTrimming.CharacterEllipsis };
         Grid.SetColumn(label, 3); grid.Children.Add(label);
         var edit = new Button { Content = "✎", Width = 22, Height = 24, Padding = new Thickness(0), BorderThickness = new Thickness(0), Background = Brushes.Transparent, Foreground = (Brush)FindResource("Muted"), ToolTip = "编辑待办" };
         System.Windows.Automation.AutomationProperties.SetName(edit, "编辑待办");
@@ -321,7 +316,7 @@ public partial class MainWindow : Window
     }
     private void AddUndoRow(Guid id)
     {
-        var undo = new Button { Content = "已完成 · 撤销", Background = Brushes.Transparent, BorderBrush = (Brush)FindResource("Purple"), Foreground = (Brush)FindResource("Purple"), Margin = new Thickness(0, 4, 0, 0) };
+        var undo = new Button { Content = "已完成 · 撤销", Background = Brushes.Transparent, BorderBrush = (Brush)FindResource("AccentText"), Foreground = (Brush)FindResource("AccentText"), Margin = new Thickness(0, 4, 0, 0) };
         undo.Click += (_, _) => { if (_undoTimers.Remove(id, out var t)) t.Stop(); _store.UndoCompletion(id); }; ItemsHost.Children.Insert(0, undo);
     }
 
@@ -373,7 +368,7 @@ public partial class MainWindow : Window
         // Window geometry must never retain a WPF HoldEnd animation. Window and
         // cursor positions are Win32 physical pixels; visual easing is separate.
         foreach (var property in new[] { LeftProperty, TopProperty, WidthProperty, HeightProperty }) BeginAnimation(property, null);
-        Width = width; Height = height; UpdateLayout();
+        Width = width; Height = height; Panel.Height = height; UpdateLayout();
         if (_ready) EnsureVisible();
         var surface = _settings.IsMinimized && !_safeMode ? (FrameworkElement)Orb : Panel;
         surface.BeginAnimation(OpacityProperty, null); surface.Opacity = 1;

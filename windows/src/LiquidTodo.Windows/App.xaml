@@ -9,9 +9,34 @@
     <SolidColorBrush x:Key="Purple" Color="#7B68EE"/>
     <SolidColorBrush x:Key="Urgent" Color="#CD5A70"/>
     <SolidColorBrush x:Key="Important" Color="#B88618"/>
-    <SolidColorBrush x:Key="GlassTint" Color="#50FFFFFF"/>
-    <SolidColorBrush x:Key="RowFill" Color="#88FFFFFF"/>
-    <SolidColorBrush x:Key="GlassBorder" Color="#AFFFFFFF"/>
+    <SolidColorBrush x:Key="RowFill" Color="#CCBEE5"/>
+    <SolidColorBrush x:Key="AccentInk" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="Surface" Color="#FFFAF8FF"/>
+    <SolidColorBrush x:Key="AccentText" Color="#60437E"/>
+    <Style x:Key="GlassActionButton" TargetType="Button">
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+        <Border x:Name="Fill" Background="{TemplateBinding Background}" CornerRadius="13" Padding="12,9">
+          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Fill" Property="Opacity" Value="0.92"/></Trigger>
+          <Trigger Property="IsPressed" Value="True"><Setter TargetName="Fill" Property="Opacity" Value="0.8"/></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Fill" Property="Opacity" Value="0.45"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Fill" Property="BorderBrush" Value="{DynamicResource Ink}"/><Setter TargetName="Fill" Property="BorderThickness" Value="1"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="CheckBox">
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
+        <Grid Width="20" Height="20" Background="Transparent">
+          <Ellipse x:Name="Ring" Stroke="{DynamicResource AccentText}" StrokeThickness="1.4" Margin="1"/>
+          <TextBlock x:Name="Tick" Text="✓" Visibility="Collapsed" Foreground="{DynamicResource Ink}" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsChecked" Value="True"><Setter TargetName="Tick" Property="Visibility" Value="Visible"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Ring" Property="StrokeThickness" Value="2.4"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
   </Application.Resources>
 </Application>

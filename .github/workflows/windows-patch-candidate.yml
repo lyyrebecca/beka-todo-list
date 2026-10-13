@@ -47,6 +47,8 @@ jobs:
           ./windows/scripts/Test-InstallerPackage.ps1 -InstallerPath release/LiquidTodo-Windows-x64-Setup-v2.0.2.exe
           Expand-Archive release/LiquidTodo-Windows-x64-Portable-v2.0.2.zip "$env:RUNNER_TEMP/orb-final-package"
           ./windows/scripts/Test-WindowInteractions.ps1 -ExecutablePath "$env:RUNNER_TEMP/orb-final-package/LiquidTodo.exe" -EvidenceDirectory evidence/orb-final -Cycles 100
+          Expand-Archive release/LiquidTodo-Windows-x64-Portable-v2.0.2.zip "$env:RUNNER_TEMP/theme-final-package"
+          ./windows/scripts/Test-VisualThemes.ps1 -ExecutablePath "$env:RUNNER_TEMP/theme-final-package/LiquidTodo.exe" -EvidenceDirectory evidence/themes
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: Windows-v2.0.2-acceptance-evidence, path: evidence }
