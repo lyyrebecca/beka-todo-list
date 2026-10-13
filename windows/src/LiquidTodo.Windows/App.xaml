@@ -13,6 +13,12 @@
     <SolidColorBrush x:Key="AccentInk" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="Surface" Color="#FFFAF8FF"/>
     <SolidColorBrush x:Key="AccentText" Color="#60437E"/>
+    <SolidColorBrush x:Key="InputFill" Color="#E3D8F2"/>
+    <SolidColorBrush x:Key="InputBorder" Color="#A58CBC"/>
+    <Style TargetType="TextBox"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource InputBorder}"/><Setter Property="Padding" Value="4"/></Style>
+    <Style TargetType="DatePicker"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource InputBorder}"/></Style>
+    <Style TargetType="ComboBox"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource InputBorder}"/></Style>
+    <Style TargetType="ComboBoxItem"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Style.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter Property="Background" Value="{DynamicResource Purple}"/><Setter Property="Foreground" Value="{DynamicResource AccentInk}"/></Trigger></Style.Triggers></Style>
     <Style x:Key="GlassActionButton" TargetType="Button">
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
         <Border x:Name="Fill" Background="{TemplateBinding Background}" CornerRadius="13" Padding="12,9">
