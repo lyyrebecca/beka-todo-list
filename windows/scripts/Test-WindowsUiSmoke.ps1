@@ -102,7 +102,17 @@ function Wait-ElementByName($window, [string]$name, [System.Windows.Automation.C
 }
 
 function Invoke-Button($element) {
-    $element.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    $pattern = $null
+    if ($element.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
+        $pattern.Invoke(); return
+    }
+    # Native MessageBox buttons can be exposed as Pane peers on hosted runners.
+    # Use the observed visible rectangle and real pointer input, then verify data.
+    $rect=$element.Current.BoundingRectangle
+    if ($element.Current.IsOffscreen -or $rect.Width -le 0 -or $rect.Height -le 0) { throw 'Control has no visible click rectangle.' }
+    [UiPointer]::SetCursorPos([int]($rect.X+$rect.Width/2),[int]($rect.Y+$rect.Height/2)) | Out-Null
+    [UiPointer]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
+    [UiPointer]::mouse_event(4,0,0,0,[UIntPtr]::Zero)
 }
 
 function Set-Text($element, [string]$value) {
@@ -156,11 +166,13 @@ function Wait-MergeButton {
         for($i=0; $i -lt $windows.Count; $i++) {
             $window=$windows.Item($i)
             if($window.Current.ProcessId -ne $script:process.Id) { continue }
-            $elements=$window.FindAll($script:descendants,$script:all)
+            $dialogCondition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty, '导入备份')
+            $dialog=if($window.Current.Name -eq '导入备份') { $window } else { $window.FindFirst($script:descendants,$dialogCondition) }
+            if(-not $dialog) { continue }
+            $elements=$dialog.FindAll($script:descendants,$script:all)
             for($j=0; $j -lt $elements.Count; $j++) {
                 $e=$elements.Item($j)
-                if($e.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and
-                    ($e.Current.AutomationId -in @('7','CommandButton_7') -or $e.Current.Name -in @('No','否','否(N)','&No','&否(N)'))) { return $e }
+                if(-not $e.Current.IsOffscreen -and ($e.Current.AutomationId -in @('7','CommandButton_7') -or $e.Current.Name -in @('No','否','否(N)','&No','&否(N)'))) { return $e }
             }
         }
         Start-Sleep -Milliseconds 100
