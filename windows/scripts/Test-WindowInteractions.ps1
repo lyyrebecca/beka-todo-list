@@ -29,6 +29,7 @@ $settingsPath = Join-Path $root 'Data\settings.json'
 if (Test-Path $settingsPath) { throw 'UI test requires a fresh extraction with no existing settings.' }
 @{ownerName='Window QA';isMinimized=$false;desktopMode=$false} | ConvertTo-Json | Set-Content -Encoding UTF8 $settingsPath
 $process = $null
+$recorder = $null
 $trace = [Collections.Generic.List[object]]::new()
 $violations = [Collections.Generic.List[string]]::new()
 $desktop = [System.Windows.Automation.AutomationElement]::RootElement
@@ -106,6 +107,13 @@ try {
     if(-not $w) { throw 'Main window did not appear.' }
     $h=[IntPtr]$w.Current.NativeWindowHandle
     Screenshot 'panel-before' $h
+    if ($env:WINAPP_TOOL -and (Test-Path $env:WINAPP_TOOL)) {
+        $env:WINAPP_UI_WORKFLOW_ID = [guid]::NewGuid().ToString()
+        & $env:WINAPP_TOOL ui inspect -w $h.ToString() --interactive --json | Out-File (Join-Path $evidence 'winapp-inspect.json') -Encoding utf8
+        $recordArgs=@('ui','record','-w',$h.ToString(),'--duration-sec','6','--fps','12','--output',('"'+(Join-Path $evidence 'drag-recording.mp4')+'"'),'--capture-screen')
+        $recorder=Start-Process $env:WINAPP_TOOL -ArgumentList $recordArgs -PassThru -RedirectStandardOutput (Join-Path $evidence 'recording-output.txt') -RedirectStandardError (Join-Path $evidence 'recording-errors.txt')
+        Start-Sleep -Milliseconds 600
+    }
     for($cycle=1; $cycle -le $Cycles; $cycle++) {
         $w=Main-Window
         $min=Find-Control $w 'MinimizeButton' ([string][char]0x2212)
@@ -130,12 +138,17 @@ try {
     if(-not $second.WaitForExit(10000)) { Stop-Process $second.Id -Force; throw 'Second instance did not exit.' }
     Check-Visible $h 'second-launch'
     if($ExpectLegacyFailure -and $violations.Count -eq 0) { throw 'Legacy regression was not reproduced; investigate instead of assuming.' }
+    if ($recorder) {
+        if(-not $recorder.WaitForExit(10000)) { Stop-Process $recorder.Id -Force }
+        & $env:WINAPP_TOOL ui yield | Out-Null
+    }
     $os=Get-CimInstance Win32_OperatingSystem
-    @{os=$os.Caption;build=$os.BuildNumber;cycles=$Cycles;legacy=$ExpectLegacyFailure.IsPresent;violations=@($violations.ToArray());dpi=[OrbInput]::GetDpiForWindow($h);status=if($ExpectLegacyFailure){'legacy-failure-reproduced'}else{'passed'};tests='Native mouse down/move/up, 2 drags per cycle, restore, bounds, process, second instance'} | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 (Join-Path $evidence 'summary.json')
+    @{os=$os.Caption;build=$os.BuildNumber;cycles=$Cycles;legacy=$ExpectLegacyFailure.IsPresent;violations=@($violations.ToArray());dpi=[OrbInput]::GetDpiForWindow($h);videoRecorded=(Test-Path (Join-Path $evidence 'drag-recording.mp4'));status=if($ExpectLegacyFailure){'legacy-failure-reproduced'}else{'passed'};tests='Native mouse down/move/up, 2 drags per cycle, restore, bounds, process, second instance'} | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 (Join-Path $evidence 'summary.json')
 }
 finally {
     $trace.ToArray() | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 (Join-Path $evidence 'window-trace.json')
     $logs=Join-Path $root 'Data\Logs'
     if(Test-Path $logs) { Copy-Item $logs (Join-Path $evidence 'diagnostics') -Recurse -Force }
+    if($recorder -and -not $recorder.HasExited) { Stop-Process $recorder.Id -Force }
     if($process -and -not $process.HasExited) { Stop-Process $process.Id -Force }
 }

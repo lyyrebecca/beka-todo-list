@@ -3,6 +3,9 @@ on:
   push: { branches: [main, feature/windows-v2] }
   pull_request:
   workflow_dispatch:
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  WINAPP_CLI_TELEMETRY_OPTOUT: 1
 jobs:
   windows:
     runs-on: windows-latest
@@ -33,6 +36,7 @@ jobs:
           Expand-Archive "$env:RUNNER_TEMP/winapp-download/winappcli-x64.zip" "$env:RUNNER_TEMP/winapp-tool"
           $tool = Get-ChildItem "$env:RUNNER_TEMP/winapp-tool" -Filter winapp.exe -Recurse | Select-Object -First 1
           if (-not $tool) { throw 'Released winapp CLI binary missing.' }
+          "WINAPP_TOOL=$($tool.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           & $tool.FullName --version | Tee-Object evidence/tooling/version.txt
           & $tool.FullName ui --help | Tee-Object evidence/tooling/ui-help.txt
           if ($LASTEXITCODE -ne 0) { Write-Host 'Released tool does not expose UI commands; using UIA/Win32 regression as planned.' }

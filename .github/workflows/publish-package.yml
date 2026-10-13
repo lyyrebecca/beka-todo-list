@@ -20,8 +20,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          DRAFT=$(gh release view "${{ inputs.version }}" --repo "${{ github.repository }}" --json isDraft --jq .isDraft)
+          test "$DRAFT" = false || { echo 'Refusing to publish an unverified Draft into Packages/latest'; exit 1; }
           gh release download "${{ inputs.version }}" --repo "${{ github.repository }}" --pattern 'LiquidTodo-*'
           gh release download "${{ inputs.version }}" --repo "${{ github.repository }}" --pattern 'SHA256SUMS.txt'
+
+      - name: Verify mirror payload
+        run: |
+          sha256sum --check SHA256SUMS.txt
+          test "$(find . -maxdepth 1 -type f -name 'LiquidTodo-*' | wc -l)" -eq 3
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3

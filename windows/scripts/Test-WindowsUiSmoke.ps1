@@ -37,6 +37,7 @@ function Find-WindowContainingElementId([string]$automationId) {
     $windows = $script:root.FindAll($script:children, $script:all)
     for ($i = 0; $i -lt $windows.Count; $i++) {
         $window = $windows.Item($i)
+        if ($script:process -and $window.Current.ProcessId -ne $script:process.Id) { continue }
         if (Find-ElementById $window $automationId) { return $window }
     }
     return $null
@@ -100,6 +101,20 @@ function Set-Text($element, [string]$value) {
     $pattern.SetValue($value)
 }
 
+function Select-Combo($window, [string]$id, [string]$itemName) {
+    $combo = Wait-ElementById $window $id
+    $combo.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
+    $condition = [System.Windows.Automation.AndCondition]::new(
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty, $itemName),
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem),
+        [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $script:process.Id))
+    $item = $script:root.FindFirst($script:descendants, $condition)
+    if (-not $item) { throw "Combo item '$itemName' was not exposed." }
+    $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+    $combo.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Collapse()
+}
+function Read-Data { Get-Content -LiteralPath (Join-Path (Split-Path $exe) 'Data\data.json') -Raw | ConvertFrom-Json }
+
 function Wait-Text($window, [string]$value, [bool]$shouldExist = $true, [int]$timeoutSeconds = 10) {
     $timer = [Diagnostics.Stopwatch]::StartNew()
     do {
@@ -152,17 +167,40 @@ try {
     Invoke-Button (Wait-ElementById $main 'AddTodoButton')
     $editor = Wait-WindowContainingElementId 'TodoTextBox'
     Set-Text (Wait-ElementById $editor 'TodoTextBox') 'Windows 中文输入与编辑验收'
+    Select-Combo $editor 'PriorityInput' '重要 🌟'
+    Select-Combo $editor 'ModeInput' '截止日期'
+    Set-Text (Wait-ElementById $editor 'DateInput') ([DateTime]::Today.AddDays(5).ToString('yyyy-MM-dd'))
+    Set-Text (Wait-ElementById $editor 'TimeInput') '22:15'
+    Select-Combo $editor 'ReminderInput' '提前一天'
+    Set-Text (Wait-ElementById $editor 'ReminderTimeInput') '21:00'
     Invoke-Button (Wait-ElementByName $editor '保存' ([System.Windows.Automation.ControlType]::Button))
     $main = Wait-WindowContainingElementId 'AddTodoButton'
     Wait-Text $main 'Windows 中文输入与编辑验收'
+    $added = (Read-Data).items[0]
+    if ($added.priority -ne 'Important' -or $added.schedule.mode -ne 'Deadline' -or $added.schedule.reminderMode -ne 'DayBefore' -or $added.schedule.reminderTimeMinutes -ne 1260) { throw 'Create priority/schedule did not persist.' }
 
     Invoke-Button (Wait-ElementByName $main '编辑待办' ([System.Windows.Automation.ControlType]::Button))
     $editor = Wait-WindowContainingElementId 'TodoTextBox'
     Set-Text (Wait-ElementById $editor 'TodoTextBox') 'Windows 中文输入编辑完成'
+    Select-Combo $editor 'ModeInput' '期间'
+    Set-Text (Wait-ElementById $editor 'StartInput') ([DateTime]::Today.AddDays(2).ToString('yyyy-MM-dd'))
+    Set-Text (Wait-ElementById $editor 'EndInput') ([DateTime]::Today.AddDays(8).ToString('yyyy-MM-dd'))
+    Set-Text (Wait-ElementById $editor 'ReminderTimeInput') '08:30'
     Invoke-Button (Wait-ElementByName $editor '保存' ([System.Windows.Automation.ControlType]::Button))
     $main = Wait-WindowContainingElementId 'AddTodoButton'
     Wait-Text $main 'Windows 中文输入编辑完成'
     Wait-Text $main 'Windows 中文输入与编辑验收' $false
+    $edited = (Read-Data).items[0]
+    if ($edited.schedule.mode -ne 'Period' -or $edited.schedule.reminderTimeMinutes -ne 510 -or $edited.schedule.startDate -ne [DateTime]::Today.AddDays(2).ToString('yyyy-MM-dd')) { throw 'Edit dates/daily reminder did not persist.' }
+
+    $importFile = Join-Path (Split-Path $exe) 'command import.json'
+    @{schemaVersion=1;exportedAt=[DateTimeOffset]::UtcNow.ToString('o');items=@(@{id=[guid]::NewGuid().ToString();text='CLI 导入验收';createdAt=[DateTimeOffset]::UtcNow.ToString('o');priority='Normal';completed=$false});archived=@()} | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 $importFile
+    $second = Start-Process $exe -ArgumentList @('--portable','--import',('"' + $importFile + '"')) -PassThru
+    if (-not $second.WaitForExit(10000)) { Stop-Process $second.Id -Force; throw 'Import second instance did not exit.' }
+    $confirmation = Wait-WindowContainingElementId '7'
+    Invoke-Button (Wait-ElementById $confirmation '7')
+    $main = Wait-WindowContainingElementId 'AddTodoButton'
+    Wait-Text $main 'CLI 导入验收'
 
     $checkbox = $main.FindFirst($script:descendants,
         [System.Windows.Automation.PropertyCondition]::new(
@@ -183,7 +221,7 @@ try {
     $main = Wait-WindowContainingElementId 'AddTodoButton'
     Wait-Text $main 'Windows 中文输入编辑完成'
 
-    Write-Host 'Windows UI smoke passed: first-run naming, CJK text entry, add/edit, completion undo and restart persistence.'
+    Write-Host 'Windows UI smoke passed: naming, Unicode text, priority, date/deadline creation, period/daily editing, second-launch import, completion undo and persistence. This is not an IME composition test.'
 }
 finally {
     if ($process -and -not $process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }

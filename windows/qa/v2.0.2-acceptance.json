@@ -1,0 +1,20 @@
+{
+  "version": "v2.0.2",
+  "publication": "blocked-pending-client-Windows-acceptance",
+  "automatedEvidence": "https://github.com/lyyrebecca/beka-todo-list/actions/runs/38371111800",
+  "automatedEnvironment": "Windows Server 2025 Datacenter build 26100; 96 DPI; 1024x768",
+  "checks": {
+    "unitTests": "72 passed locally; rerun in candidate pipeline",
+    "legacyMouseReproduction": "passed: v2.0.1 restored panel outside work area",
+    "mouseCycles100": "passed: 100 cycles, 200 real mouse drags, no boundary or process failures",
+    "installerAndPortableCandidate": "pending",
+    "windows10_22H2": "not-tested",
+    "windows11": "not-tested",
+    "mixedDpiMultiMonitor": "algorithm-tested; not physically tested",
+    "imeMicrosoftPinyin": "not-tested; Unicode UIA writing is not IME testing",
+    "imeWeChat": "not-tested",
+    "notificationCenter": "not-tested"
+  },
+  "localVm": "Existing UTM x64 virtual disk has no mapped guest data and no installed Windows OS. VM returned to stopped state.",
+  "policy": "Draft only until every client acceptance check passes. Do not update Packages latest or replace stable assets. No paid cloud resources."
+}

@@ -7,6 +7,12 @@
 <p align="center"><img src="public-assets/screenshots/todo-panel.png" width="49%" alt="macOS 版 Todo list 主界面"> <img src="public-assets/screenshots/windows-todo-panel.png" width="49%" alt="Windows 版 Todo list 主界面"></p>
 <p align="center"><sub>左：macOS · 右：Windows x64；Windows 图由 GitHub Windows runner 实际渲染，使用演示数据</sub></p>
 
+## Windows 修复候选版验收
+
+`v2.0.2` 正在修复悬浮球拖动、贴边和窗口找回，并扩展 Windows 回归测试。正式下载仍是下表的 `v2.0.1`；在 Windows 客户端验收完成前，不将候选包冒充 Latest。
+
+修复内容见 [v2.0.2 修改说明](windows/qa/v2.0.2-release-notes.md)，测试范围与未完成项见 [验收清单](windows/qa/v2.0.2-acceptance.json)。本次 Mac 保持 v2.0.1。
+
 ## 选哪个下载？
 
 | 你的电脑 | 下载文件 | 适合谁 | 打开方式 |
