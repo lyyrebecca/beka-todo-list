@@ -58,6 +58,7 @@ public partial class App : System.Windows.Application
 
     private void HandleSecondLaunch(InstanceCommand command)
     {
+        _diagnostics?.Write("instance", $"received action={command.Action}; hasImportPath={command.ImportPath is not null}");
         _mainWindow?.ActivateFromSecondLaunch("activate");
         if (command.Action == "import" && command.ImportPath is {} path) _mainWindow?.ImportRequestedBackup(path);
     }

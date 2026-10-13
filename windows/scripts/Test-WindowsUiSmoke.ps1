@@ -149,6 +149,24 @@ function Select-Combo($window, [string]$id, [string]$itemName) {
     }
     $combo.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Collapse()
 }
+function Wait-MergeButton {
+    $timer=[Diagnostics.Stopwatch]::StartNew()
+    do {
+        $windows=$script:root.FindAll($script:children,$script:all)
+        for($i=0; $i -lt $windows.Count; $i++) {
+            $window=$windows.Item($i)
+            if($window.Current.ProcessId -ne $script:process.Id) { continue }
+            $elements=$window.FindAll($script:descendants,$script:all)
+            for($j=0; $j -lt $elements.Count; $j++) {
+                $e=$elements.Item($j)
+                if($e.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and
+                    ($e.Current.AutomationId -in @('7','CommandButton_7') -or $e.Current.Name -in @('No','否','否(N)','&No','&否(N)'))) { return $e }
+            }
+        }
+        Start-Sleep -Milliseconds 100
+    } while($timer.Elapsed.TotalSeconds -lt 15)
+    throw 'CLI import confirmation merge/No button did not appear.'
+}
 function Read-Data { Get-Content -LiteralPath (Join-Path (Split-Path $exe) 'Data\data.json') -Raw | ConvertFrom-Json }
 
 function Wait-Text($window, [string]$value, [bool]$shouldExist = $true, [int]$timeoutSeconds = 10) {
@@ -214,7 +232,7 @@ try {
     $main = Wait-WindowContainingElementId 'AddTodoButton'
     Wait-Text $main 'Windows 中文输入与编辑验收'
     $added = (Read-Data).items[0]
-    if ($added.priority -ne 'Important' -or $added.schedule.mode -ne 'Deadline' -or $added.schedule.reminderMode -ne 'DayBefore' -or $added.schedule.reminderTimeMinutes -ne 1260) { throw 'Create priority/schedule did not persist.' }
+    if ([DateTimeOffset]::Parse($added.schedule.date).LocalDateTime.Date -ne [DateTime]::Today.AddDays(5) -or [DateTimeOffset]::Parse($added.schedule.date).LocalDateTime.Hour -ne 22 -or $added.priority -ne 'Important' -or $added.schedule.mode -ne 'Deadline' -or $added.schedule.reminderMode -ne 'DayBefore' -or $added.schedule.reminderTimeMinutes -ne 1260) { throw 'Create priority/schedule did not persist.' }
 
     Invoke-Button (Wait-ElementByName $main '编辑待办' ([System.Windows.Automation.ControlType]::Button))
     $editor = Wait-WindowContainingElementId 'TodoTextBox'
@@ -236,8 +254,7 @@ try {
     @{schemaVersion=1;exportedAt=[DateTimeOffset]::UtcNow.ToString('o');items=@(@{id=[guid]::NewGuid().ToString();text='CLI 导入验收';createdAt=[DateTimeOffset]::UtcNow.ToString('o');priority='Normal';completed=$false});archived=@()} | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 $importFile
     $second = Start-Process $exe -ArgumentList @('--portable','--import',('"' + $importFile + '"')) -PassThru
     if (-not $second.WaitForExit(10000)) { Stop-Process $second.Id -Force; throw 'Import second instance did not exit.' }
-    $confirmation = Wait-WindowContainingElementId '7'
-    Invoke-Button (Wait-ElementById $confirmation '7')
+    Invoke-Button (Wait-MergeButton)
     $main = Wait-WindowContainingElementId 'AddTodoButton'
     Wait-Text $main 'CLI 导入验收'
 
@@ -265,6 +282,15 @@ try {
 catch {
     Write-Host $_.ScriptStackTrace
     Write-Host $_.Exception.ToString()
+    $windows=$script:root.FindAll($script:children,$script:all)
+    for($i=0; $i -lt $windows.Count; $i++) {
+        $w=$windows.Item($i)
+        if($process -and $w.Current.ProcessId -eq $process.Id) {
+            Write-Host "APP WINDOW: $($w.Current.Name)"
+            $elements=$w.FindAll($script:descendants,$script:all)
+            for($j=0; $j -lt $elements.Count; $j++) { $e=$elements.Item($j); Write-Host "$($e.Current.ControlType.ProgrammaticName) ID=$($e.Current.AutomationId) NAME=$($e.Current.Name)" }
+        }
+    }
     $logRoot = Join-Path (Split-Path $exe) 'Data\Logs'
     Get-ChildItem $logRoot -Filter 'startup-*.log' -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName }
     throw
