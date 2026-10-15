@@ -169,7 +169,32 @@ try {
   [ThemeNative]::mouse_event(2,0,0,0,[UIntPtr]::Zero);[ThemeNative]::mouse_event(4,0,0,0,[UIntPtr]::Zero)
   Start-Sleep -Milliseconds 300
  }
- @{status='passed';checks='Live day/night/day switch; native U+5E72 orb label; transparent corners on light/dark desktop';os=(Get-CimInstance Win32_OperatingSystem).Caption;dpi='per-window native capture';realDesktopCapture=$true} | ConvertTo-Json | Set-Content (Join-Path $evidence 'summary.json') -Encoding UTF8
+ # Also retain the app's own native WPF render with its real alpha channel.
+ # Unlike desktop captures, these contain no console behind rounded corners.
+ Stop-Process $process.Id -Force;$process.WaitForExit()
+ foreach($dark in @($false,$true)) {
+  Apply-TestTheme $dark
+  $name=if($dark){'night'}else{'day'}
+  foreach($orb in @($false,$true)) {
+   $settings=Get-Content (Join-Path $data 'settings.json') -Raw | ConvertFrom-Json
+   $settings.isMinimized=$orb
+   $settings | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $data 'settings.json') -Encoding UTF8
+   $kind=if($orb){'orb'}else{'panel'};$target=Join-Path $evidence "$name-$kind-native.png"
+   $process=Start-Process $exe -ArgumentList '--portable','--diagnostics','--capture-screenshot',('"'+$target+'"') -PassThru
+   if(-not $process.WaitForExit(30000)){throw 'Native WPF screenshot export timed out.'}
+   if($process.ExitCode -ne 0 -or -not (Test-Path $target)){throw 'Native WPF screenshot export failed.'}
+   if($orb) {
+    $native=[Drawing.Bitmap]::new($target)
+    try {
+     foreach($p in @(@(0,0),@(($native.Width-1),0),@(0,($native.Height-1)),@(($native.Width-1),($native.Height-1)))) {
+      if($native.GetPixel($p[0],$p[1]).A -ne 0){throw 'Native orb corner alpha must be zero, independent of desktop background.'}
+     }
+     if($native.GetPixel([int]($native.Width/2),[int]($native.Height/2)).A -lt 240){throw 'Native orb center is missing.'}
+    }finally{$native.Dispose()}
+   }
+  }
+ }
+ @{status='passed';checks='Live day/night/day switch including task-row backgrounds and ink; real editor captures; native U+5E72 orb label; corners match actual desktop underlay and native corner alpha is zero';os=(Get-CimInstance Win32_OperatingSystem).Caption;dpi='per-window native capture';realDesktopCapture=$true;nativeWpfRenders=$true} | ConvertTo-Json | Set-Content (Join-Path $evidence 'summary.json') -Encoding UTF8
 } finally {
  if($process -and -not $process.HasExited){Stop-Process $process.Id -Force}
  if($backdrop){$backdrop.Close();$backdrop.Dispose()}
