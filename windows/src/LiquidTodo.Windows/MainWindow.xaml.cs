@@ -40,11 +40,14 @@ public partial class MainWindow : Window
     private bool _ready;
     private bool _showAllItems;
     private HwndSource? _themeSource;
+    private readonly StartupDiagnostics? _interactionDiagnostics;
 
     public MainWindow(LiquidTodoPaths paths, TodoStore store, string[] arguments, bool safeMode = false)
     {
         InitializeComponent();
         _paths = paths; _store = store; _safeMode = safeMode; _settingsService = new SettingsService(paths.SettingsFile); _settings = _settingsService.Load();
+        if (arguments.Any(x => x.Equals("--diagnostics", StringComparison.OrdinalIgnoreCase)))
+            _interactionDiagnostics = StartupDiagnostics.Create(paths);
         ApplyTheme();
         SourceInitialized += (_, _) => { _themeSource = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle); _themeSource?.AddHook(ThemeMessage); };
         SystemEvents.UserPreferenceChanged += SystemPreferenceChanged;
@@ -95,6 +98,10 @@ public partial class MainWindow : Window
     }
     private IntPtr ThemeMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        // Only opt-in QA logs; never include task text, names, paths or imports.
+        // Distinguish missing native input from WPF capture loss in stress runs.
+        if (_settings.IsMinimized && message is 0x0201 or 0x0202 or 0x0215 or 0x001F)
+            TraceOrb($"native-{message:X4}");
         // Windows broadcasts both messages for app-theme changes. Do not rely on
         // a particular SystemEvents preference category from different OS builds.
         if (_ready && message is 0x001A or 0x031A) Dispatcher.BeginInvoke(new Action(ApplyTheme));
@@ -190,18 +197,23 @@ public partial class MainWindow : Window
         SubTitle.Text = showArchive ? $"已完成 {source.Count} 项" : _store.Items.Count == 0 ? "今天，把一件事做好" : $"还有 {_store.Items.Count} 项待办";
         ArchiveButton.Content = showArchive ? "‹" : "◷";
         if (source.Count == 0)
-            ItemsHost.Children.Add(new TextBlock { Text = showArchive ? "还没有已完成的待办" : "暂无待办，点下方 + 添加", Foreground = (Brush)FindResource("Muted"), Margin = new Thickness(4, 14, 4, 14), FontSize = 12, TextAlignment = TextAlignment.Center });
+        {
+            var empty = new TextBlock { Text = showArchive ? "还没有已完成的待办" : "暂无待办，点下方 + 添加", Margin = new Thickness(4, 14, 4, 14), FontSize = 12, TextAlignment = TextAlignment.Center };
+            empty.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); ItemsHost.Children.Add(empty);
+        }
         var limit = showArchive || _showAllItems ? source.Count : Math.Min(10, source.Count);
         foreach (var item in source.Take(limit)) ItemsHost.Children.Add(showArchive ? CreateArchiveRow(item) : CreateTodoRow(item));
         if (!showArchive && source.Count > 10)
         {
             var toggle = new Button { Content = _showAllItems ? "⌃  收起" : $"⌄  还有 {source.Count - 10} 条", Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = (Brush)FindResource("AccentText"), Padding = new Thickness(8, 6, 8, 6), HorizontalContentAlignment = System.Windows.HorizontalAlignment.Left, Cursor = Cursors.Hand };
+            toggle.SetResourceReference(Control.ForegroundProperty, "AccentText");
             toggle.Click += (_, _) => { _showAllItems = !_showAllItems; Render(); };
             ItemsHost.Children.Add(toggle);
         }
         if (showArchive && source.Count > 0)
         {
             var clear = new Button { Content = "清空全部已完成", Background = Brushes.Transparent, BorderThickness = new Thickness(0), Foreground = (Brush)FindResource("Muted"), Padding = new Thickness(6), Cursor = Cursors.Hand };
+            clear.SetResourceReference(Control.ForegroundProperty, "Muted");
             clear.Click += (_, _) => ClearArchived(); ItemsHost.Children.Add(clear);
         }
         AddButton.Visibility = showArchive ? Visibility.Collapsed : Visibility.Visible;
@@ -213,6 +225,9 @@ public partial class MainWindow : Window
     private Border CreateTodoRow(TodoItem item)
     {
         var row = new Border { Background = (Brush)FindResource("RowFill"), CornerRadius = new CornerRadius(12), Padding = new Thickness(8, 6, 6, 6), Margin = new Thickness(0, 3, 0, 3), Tag = item.Id };
+        // Runtime-created controls need resource expressions too. A FindResource
+        // brush is only a snapshot and leaves rows in the previous theme.
+        row.SetResourceReference(Border.BackgroundProperty, "RowFill");
         var grid = new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(25) }); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(15) }); grid.ColumnDefinitions.Add(new ColumnDefinition()); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(96) }); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(25) }); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(20) });
         var done = new CheckBox { VerticalAlignment = VerticalAlignment.Center, ToolTip = item.Completed ? "撤销完成" : "标记为完成", IsChecked = item.Completed, IsThreeState = false };
         done.Checked += (_, _) => { if (!item.Completed) CompleteWithUndo(item.Id); };
@@ -221,13 +236,17 @@ public partial class MainWindow : Window
         if (item.Priority != TodoPriority.Normal)
         {
             var badge = new TextBlock { Text = item.Priority == TodoPriority.Important ? "★" : "‼", Foreground = (Brush)FindResource(item.Priority == TodoPriority.Important ? "Important" : "Urgent"), FontSize = 11, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center, ToolTip = item.Priority == TodoPriority.Important ? "重要" : "紧急" };
+            badge.SetResourceReference(TextBlock.ForegroundProperty, item.Priority == TodoPriority.Important ? "Important" : "Urgent");
             Grid.SetColumn(badge, 1); grid.Children.Add(badge);
         }
         var text = new TextBlock { Text = item.Text, Foreground = item.Completed ? (Brush)FindResource("Muted") : (Brush)FindResource("Ink"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, Cursor = Cursors.Hand, TextDecorations = item.Completed ? TextDecorations.Strikethrough : null };
+        text.SetResourceReference(TextBlock.ForegroundProperty, item.Completed ? "Muted" : "Ink");
         text.MouseLeftButtonUp += (_, _) => Edit(item); Grid.SetColumn(text, 2); grid.Children.Add(text);
         var label = new TextBlock { Text = LabelFor(item), Foreground = IsOverdue(item) ? (Brush)FindResource("Urgent") : (Brush)FindResource("AccentText"), FontSize = 10, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Right, TextTrimming = TextTrimming.CharacterEllipsis };
+        label.SetResourceReference(TextBlock.ForegroundProperty, IsOverdue(item) ? "Urgent" : "AccentText");
         Grid.SetColumn(label, 3); grid.Children.Add(label);
         var edit = new Button { Content = "✎", Width = 22, Height = 24, Padding = new Thickness(0), BorderThickness = new Thickness(0), Background = Brushes.Transparent, Foreground = (Brush)FindResource("Muted"), ToolTip = "编辑待办" };
+        edit.SetResourceReference(Control.ForegroundProperty, "Muted");
         System.Windows.Automation.AutomationProperties.SetName(edit, "编辑待办");
         edit.Click += (_, _) => Edit(item); Grid.SetColumn(edit, 4); grid.Children.Add(edit);
         var handle = new Thumb { Width = 18, Height = 28, Cursor = Cursors.SizeAll, ToolTip = "拖动调整顺序", Opacity = .65, Template = CreateHandleTemplate() };
@@ -242,16 +261,19 @@ public partial class MainWindow : Window
 
     private static ControlTemplate CreateHandleTemplate()
     {
-        var factory = new FrameworkElementFactory(typeof(TextBlock)); factory.SetValue(TextBlock.TextProperty, "⋮⋮"); factory.SetValue(TextBlock.ForegroundProperty, Brushes.Gray); factory.SetValue(TextBlock.FontSizeProperty, 12d); factory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center); factory.SetValue(TextBlock.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Center); return new ControlTemplate(typeof(Thumb)) { VisualTree = factory };
+        var factory = new FrameworkElementFactory(typeof(TextBlock)); factory.SetValue(TextBlock.TextProperty, "⋮⋮"); factory.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); factory.SetValue(TextBlock.FontSizeProperty, 12d); factory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center); factory.SetValue(TextBlock.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Center); return new ControlTemplate(typeof(Thumb)) { VisualTree = factory };
     }
 
     private Border CreateArchiveRow(TodoItem item)
     {
         var row = new Border { Background = (Brush)FindResource("RowFill"), CornerRadius = new CornerRadius(11), Padding = new Thickness(10, 7, 8, 7), Margin = new Thickness(0, 3, 0, 3) };
+        row.SetResourceReference(Border.BackgroundProperty, "RowFill");
         var grid = new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition()); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(52) }); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) });
-        grid.Children.Add(new TextBlock { Text = item.Text, Foreground = (Brush)FindResource("Muted"), TextDecorations = TextDecorations.Strikethrough, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+        var archivedText = new TextBlock { Text = item.Text, TextDecorations = TextDecorations.Strikethrough, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        archivedText.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); grid.Children.Add(archivedText);
         var restore = new Button { Content = "恢复", FontSize = 10, Padding = new Thickness(4, 1, 4, 1) }; restore.Click += (_, _) => _store.RestoreArchived(item.Id); Grid.SetColumn(restore, 1); grid.Children.Add(restore);
-        var delete = new Button { Content = "×", FontSize = 15, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Foreground = (Brush)FindResource("Muted"), ToolTip = "永久删除" }; delete.Click += (_, _) => _store.Delete(item.Id); Grid.SetColumn(delete, 2); grid.Children.Add(delete);
+        var delete = new Button { Content = "×", FontSize = 15, BorderThickness = new Thickness(0), Background = Brushes.Transparent, ToolTip = "永久删除" };
+        delete.SetResourceReference(Control.ForegroundProperty, "Muted"); delete.Click += (_, _) => _store.Delete(item.Id); Grid.SetColumn(delete, 2); grid.Children.Add(delete);
         row.Child = grid; return row;
     }
 
@@ -319,6 +341,7 @@ public partial class MainWindow : Window
     private void AddUndoRow(Guid id)
     {
         var undo = new Button { Content = "已完成 · 撤销", Background = Brushes.Transparent, BorderBrush = (Brush)FindResource("AccentText"), Foreground = (Brush)FindResource("AccentText"), Margin = new Thickness(0, 4, 0, 0) };
+        undo.SetResourceReference(Control.BorderBrushProperty, "AccentText"); undo.SetResourceReference(Control.ForegroundProperty, "AccentText");
         undo.Click += (_, _) => { if (_undoTimers.Remove(id, out var t)) t.Stop(); _store.UndoCompletion(id); }; ItemsHost.Children.Insert(0, undo);
     }
 
@@ -379,19 +402,22 @@ public partial class MainWindow : Window
     }
     private void Orb_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        TraceOrb("down-received");
         StopSnap();
         if (!NativeWindow.TryCursorPosition(out _orbStartMouse)) return;
         var bounds = NativeWindow.Bounds(this);
         _grabX = (_orbStartMouse.X - bounds.X) / Math.Max(1, bounds.Width);
         _grabY = (_orbStartMouse.Y - bounds.Y) / Math.Max(1, bounds.Height);
         _orbDragging = false; _orbPressed = Orb.CaptureMouse(); e.Handled = true;
+        TraceOrb("down-capture-result");
     }
     private void Orb_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
         if (!_orbPressed || !Orb.IsMouseCaptured) return;
         if (e.LeftButton != MouseButtonState.Pressed) { EndOrbGesture(true); return; }
         if (!NativeWindow.TryCursorPosition(out var cursor)) return;
-        if (Math.Abs(cursor.X - _orbStartMouse.X) + Math.Abs(cursor.Y - _orbStartMouse.Y) > WindowSnapService.DipsToPixels(3, NativeWindow.Dpi(this))) _orbDragging = true;
+        if (!_orbDragging && Math.Abs(cursor.X - _orbStartMouse.X) + Math.Abs(cursor.Y - _orbStartMouse.Y) > WindowSnapService.DipsToPixels(3, NativeWindow.Dpi(this)))
+        { _orbDragging = true; TraceOrb("drag-start"); }
         if (!_orbDragging) return;
         var bounds = NativeWindow.Bounds(this);
         var screen = Forms.Screen.FromPoint(new System.Drawing.Point(cursor.X, cursor.Y));
@@ -402,11 +428,23 @@ public partial class MainWindow : Window
     }
     private void Orb_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
+        TraceOrb("up-received");
         if (!_orbPressed) return;
         var wasDrag = _orbDragging; EndOrbGesture(false);
         if (wasDrag) SnapOrb(true); else SetMinimized(false, true); e.Handled = true;
     }
-    private void Orb_LostMouseCapture(object sender, MouseEventArgs e) { if (_orbPressed) EndOrbGesture(true); }
+    private void Orb_LostMouseCapture(object sender, MouseEventArgs e) { TraceOrb("capture-lost"); if (_orbPressed) EndOrbGesture(true); }
+    private void TraceOrb(string stage)
+    {
+        if (_interactionDiagnostics is null) return;
+        var bounds = NativeWindow.Bounds(this);
+        var cursorAvailable = NativeWindow.TryCursorPosition(out var cursor);
+        _interactionDiagnostics.Write("orb-" + stage,
+            $"bounds={bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}; dpi={NativeWindow.Dpi(this)}; " +
+            $"cursorAvailable={cursorAvailable}; cursor={cursor.X},{cursor.Y}; " +
+            $"pressed={_orbPressed}; dragging={_orbDragging}; captured={Orb.IsMouseCaptured}; " +
+            $"visible={IsVisible}; snapping={_motionTarget is not null}");
+    }
     private void EndOrbGesture(bool snap)
     {
         var pressed = _orbPressed; _orbPressed = false;

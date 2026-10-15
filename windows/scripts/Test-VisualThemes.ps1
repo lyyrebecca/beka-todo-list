@@ -62,6 +62,30 @@ function Wait-Theme([string]$label) {
  } while($clock.Elapsed.TotalSeconds -lt 15)
  throw "Live theme change did not reach $label"
 }
+function Capture-Editor($main,[string]$name) {
+ $add=$main.FindFirst($descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::AutomationIdProperty,'AddTodoButton'))
+ $r=$add.Current.BoundingRectangle
+ [ThemeNative]::SetCursorPos([int]($r.X+$r.Width/2),[int]($r.Y+$r.Height/2)) | Out-Null
+ [ThemeNative]::mouse_event(2,0,0,0,[UIntPtr]::Zero);[ThemeNative]::mouse_event(4,0,0,0,[UIntPtr]::Zero)
+ $editor=$null;$text=$null;$clock=[Diagnostics.Stopwatch]::StartNew()
+ do {
+  $all=$desktop.FindAll($children,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty,$process.Id))
+  for($i=0;$i -lt $all.Count;$i++) {
+   $candidate=$all.Item($i)
+   $input=$candidate.FindFirst($descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::AutomationIdProperty,'TodoTextBox'))
+   if($input){$editor=$candidate;$text=$input;break}
+  }
+  if(-not $editor){Start-Sleep -Milliseconds 100}
+ }while(-not $editor -and $clock.Elapsed.TotalSeconds -lt 10)
+ if(-not $editor){throw 'Native click did not open the task editor.'}
+ # Demo text for a real rendered form; this is deliberately not claimed as IME.
+ $text.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('写下今天的一件事')
+ Start-Sleep -Milliseconds 200
+ Screenshot "$name-editor" ([IntPtr]$editor.Current.NativeWindowHandle)
+ $cancel=$editor.FindFirst($descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'取消'))
+ $cancel.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+ Start-Sleep -Milliseconds 150
+}
 function Screenshot([string]$name,[IntPtr]$h) {
  $r=[ThemeNative+RECT]::new()
  if(-not [ThemeNative]::GetWindowRect($h,[ref]$r)){throw 'Window unavailable for visual capture.'}
@@ -90,6 +114,20 @@ function Screenshot([string]$name,[IntPtr]$h) {
    if($sample.B-$sample.G -lt 18 -or $sample.R-$sample.G -lt 8){throw 'Captured reading plane is not the approved purple material, or was obscured.'}
    if($name -like 'night*' -and $sample.G -gt 130){throw 'Night plane is too bright or did not switch.'}
    if($name -like 'day*' -and ($sample.G -lt 155 -or $sample.G -gt 215)){throw 'Day plane is too bright/dark or did not switch.'}
+   # The panel surface can switch while programmatic rows retain stale brushes.
+   # Check all three row backgrounds away from glyphs, after both live changes.
+   $expected=if($name -like 'night*'){[Drawing.Color]::FromArgb(94,77,112)}else{[Drawing.Color]::FromArgb(204,190,229)}
+   foreach($rowY in @(75,121,167)) {
+    $row=$b.GetPixel(200,$rowY)
+    if([Math]::Abs($row.R-$expected.R)+[Math]::Abs($row.G-$expected.G)+[Math]::Abs($row.B-$expected.B) -gt 10){throw "Stale task-row theme at $name y=$rowY : actual $row, expected $expected"}
+   }
+   $ink=if($name -like 'night*'){[Drawing.Color]::FromArgb(248,241,255)}else{[Drawing.Color]::FromArgb(64,48,80)}
+   $inkPixels=0
+   for($y=78;$y -lt 96;$y++){for($x=64;$x -lt 175;$x++){
+    $pixel=$b.GetPixel($x,$y)
+    if([Math]::Abs($pixel.R-$ink.R)+[Math]::Abs($pixel.G-$ink.G)+[Math]::Abs($pixel.B-$ink.B) -lt 30){$inkPixels++}
+   }}
+   if($inkPixels -lt 12){throw 'Rendered task text did not adopt the current theme ink.'}
   }
   if($name -like '*orb*') {
    foreach($p in @(@(0,0),@(($b.Width-1),0),@(0,($b.Height-1)),@(($b.Width-1),($b.Height-1)))) {
@@ -118,6 +156,7 @@ try {
   Start-Sleep -Milliseconds 350
   $name=if($dark){'night'}else{'day'}
   Screenshot "$name-panel" $h
+  Capture-Editor $w $name
   $id=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::AutomationIdProperty,'MinimizeButton')
   $button=$w.FindFirst($descendants,$id);$button.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
   Start-Sleep -Milliseconds 300
