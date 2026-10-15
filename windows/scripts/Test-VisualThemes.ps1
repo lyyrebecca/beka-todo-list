@@ -72,6 +72,10 @@ function Capture-Editor($main,[string]$name) {
   $all=$desktop.FindAll($children,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty,$process.Id))
   for($i=0;$i -lt $all.Count;$i++) {
    $candidate=$all.Item($i)
+   # Owned WPF windows may be descendants of the main UIA window. Capture
+   # the editor's actual HWND, not its owner's rectangle with a clipped overlay.
+   if($candidate.Current.Name -ne '待办'){$candidate=$candidate.FindFirst($descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,'待办'))}
+   if(-not $candidate -or -not $candidate.Current.NativeWindowHandle){continue}
    $input=$candidate.FindFirst($descendants,[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::AutomationIdProperty,'TodoTextBox'))
    if($input){$editor=$candidate;$text=$input;break}
   }
@@ -89,6 +93,7 @@ function Capture-Editor($main,[string]$name) {
 function Screenshot([string]$name,[IntPtr]$h) {
  $r=[ThemeNative+RECT]::new()
  if(-not [ThemeNative]::GetWindowRect($h,[ref]$r)){throw 'Window unavailable for visual capture.'}
+ if($name -like '*editor*' -and (($r.Right-$r.Left) -lt 400 -or ($r.Bottom-$r.Top) -lt 450)){throw 'Editor capture selected an owner window instead of the full dialog.'}
  $b=[Drawing.Bitmap]::new(($r.Right-$r.Left),($r.Bottom-$r.Top)); $g=[Drawing.Graphics]::FromImage($b)
  $underlay=$null
  try {

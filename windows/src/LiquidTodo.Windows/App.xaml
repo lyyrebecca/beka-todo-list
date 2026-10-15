@@ -19,7 +19,41 @@
     <Style TargetType="TextBox"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource InputBorder}"/><Setter Property="Padding" Value="4"/></Style>
     <Style TargetType="{x:Type primitives:DatePickerTextBox}"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/></Style>
     <Style TargetType="DatePicker"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource InputBorder}"/></Style>
-    <Style TargetType="ComboBox"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="BorderBrush" Value="{DynamicResource InputBorder}"/></Style>
+    <!-- The Aero combo template paints a light SystemColors face even when
+         Background is dark. Use theme-aware chrome while retaining native
+         ComboBox keyboard, selection, focus, popup and UIA behavior. -->
+    <Style TargetType="ComboBox">
+      <Setter Property="Background" Value="{DynamicResource InputFill}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource InputBorder}"/>
+      <Setter Property="MinHeight" Value="30"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox">
+        <Grid>
+          <primitives:ToggleButton x:Name="DropDownToggle" Focusable="False" ClickMode="Press"
+            IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+            <primitives:ToggleButton.Template><ControlTemplate TargetType="primitives:ToggleButton">
+              <Border x:Name="Chrome" CornerRadius="5" Background="{DynamicResource InputFill}" BorderBrush="{DynamicResource InputBorder}" BorderThickness="1">
+                <TextBlock Text="⌄" Foreground="{DynamicResource Ink}" Margin="0,0,9,2" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+              </Border>
+              <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Purple}"/></Trigger></ControlTemplate.Triggers>
+            </ControlTemplate></primitives:ToggleButton.Template>
+          </primitives:ToggleButton>
+          <ContentPresenter IsHitTestVisible="False" Margin="8,3,28,3" VerticalAlignment="Center" HorizontalAlignment="Left"
+            Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+            ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}" TextElement.Foreground="{DynamicResource Ink}"/>
+          <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False" PopupAnimation="None">
+            <Border Background="{DynamicResource InputFill}" BorderBrush="{DynamicResource InputBorder}" BorderThickness="1" CornerRadius="5" Padding="2"
+              MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+              <ScrollViewer CanContentScroll="True" VerticalScrollBarVisibility="Auto"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer>
+            </Border>
+          </Popup>
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+          <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="DropDownToggle" Property="BorderBrush" Value="{DynamicResource Ink}"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style TargetType="ComboBoxItem"><Setter Property="Background" Value="{DynamicResource InputFill}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Style.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter Property="Background" Value="{DynamicResource Purple}"/><Setter Property="Foreground" Value="{DynamicResource AccentInk}"/></Trigger></Style.Triggers></Style>
     <Style x:Key="GlassActionButton" TargetType="Button">
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
