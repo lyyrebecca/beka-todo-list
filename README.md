@@ -13,6 +13,13 @@
 
 修复内容见 [v2.0.2 修改说明](windows/qa/v2.0.2-release-notes.md)，测试范围与未完成项见 [验收清单](windows/qa/v2.0.2-acceptance.json)。本次 Mac 保持 v2.0.1。
 
+### 新版 Windows 外观（候选版真实渲染）
+
+<p align="center"><img src="public-assets/screenshots/windows-v202-day.png" width="46%" alt="Windows v2.0.2 候选版：白天轻雾紫"> <img src="public-assets/screenshots/windows-v202-night.png" width="46%" alt="Windows v2.0.2 候选版：夜间烟紫玻璃"></p>
+<p align="center"><sub>白天「轻雾紫」· 夜间「烟紫玻璃」。随 Windows 应用主题切换；来自最终候选包在 Windows Server 2025 runner 的实际 WPF 渲染，使用演示数据，不是 Windows 11 实机截图或 AI 效果图。</sub></p>
+
+紫色「干」球使用原生中文字，圆形外侧完全透明；完整编辑器及验收说明见 [Windows v2.0.2 图形回归](windows/qa/v2.0.2-visual-qa.md)。候选版托盘增加 **「找回窗口」**，恢复到工作区并退出鼠标穿透模式。
+
 ## 选哪个下载？
 
 | 你的电脑 | 下载文件 | 适合谁 | 打开方式 |
@@ -44,7 +51,8 @@
 | 创建、完整编辑、拖动排序、三级重要度 | ✅ | ✅ |
 | 截止日期、某一天、期间与提醒 | ✅ | ✅ |
 | 完成、4 秒撤销、历史恢复 | ✅ | ✅ |
-| 中文输入法、悬浮球、托盘、开机启动 | ✅ | ✅ |
+| 悬浮球、托盘、开机启动 | ✅ | 已实现；runner 回归通过 |
+| 中文输入法组合输入 | ✅ | 微软拼音 / 微信输入法客户端实测待完成 |
 | 自定义 `xxの Todo list` 名称 | ✅ | ✅ |
 | 跨平台 JSON 导入 / 导出 | ✅ | ✅ |
 
@@ -72,6 +80,8 @@ dotnet publish windows/src/LiquidTodo.Windows -c Release -r win-x64 --self-conta
 ```
 
 Windows CI 会跑单元测试并构建自包含发布产物；最新通过记录见 [Actions](../../actions)。
+
+Windows runner 的功能回归不能替代 Windows 10/11 客户端、实际混合 DPI 多屏、输入法候选框或通知中心验收。这些条件未完成前，v2.0.2 保持 Draft，Release 与 Packages 的 `latest` 不变。
 
 ### Windows Portable 无法启动？
 
