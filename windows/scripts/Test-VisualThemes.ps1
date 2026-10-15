@@ -14,6 +14,8 @@ public static class ThemeNative {
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out RECT r);
  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h,IntPtr after,int x,int y,int w,int height,uint flags);
+ [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h,int command);
+ [DllImport("dwmapi.dll")] public static extern int DwmFlush();
  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
  [DllImport("user32.dll")] public static extern void mouse_event(uint f,uint x,uint y,uint d,UIntPtr e);
  [DllImport("user32.dll")] public static extern IntPtr SetProcessDpiAwarenessContext(IntPtr c);
@@ -64,7 +66,23 @@ function Screenshot([string]$name,[IntPtr]$h) {
  $r=[ThemeNative+RECT]::new()
  if(-not [ThemeNative]::GetWindowRect($h,[ref]$r)){throw 'Window unavailable for visual capture.'}
  $b=[Drawing.Bitmap]::new(($r.Right-$r.Left),($r.Bottom-$r.Top)); $g=[Drawing.Graphics]::FromImage($b)
+ $underlay=$null
  try {
+  if($name -like '*orb*') {
+   # Compare the exact desktop pixels beneath this window, not a Form.BackColor
+   # assumption. A QA console may otherwise cover the backdrop and falsely fail
+   # a perfectly transparent corner. Keep both captures as inspectable evidence.
+   [ThemeNative]::ShowWindow($h,0) | Out-Null
+   [Windows.Forms.Application]::DoEvents();[ThemeNative]::DwmFlush() | Out-Null
+   Start-Sleep -Milliseconds 120
+   $underlay=[Drawing.Bitmap]::new($b.Width,$b.Height)
+   $ug=[Drawing.Graphics]::FromImage($underlay)
+   try {$ug.CopyFromScreen([Drawing.Point]::new($r.Left,$r.Top),[Drawing.Point]::Empty,$underlay.Size)} finally {$ug.Dispose()}
+   $underlay.Save((Join-Path $evidence "$name-underlay.png"),[Drawing.Imaging.ImageFormat]::Png)
+   [ThemeNative]::ShowWindow($h,8) | Out-Null
+   [ThemeNative]::SetWindowPos($h,[IntPtr](-1),0,0,0,0,0x13) | Out-Null
+   [ThemeNative]::DwmFlush() | Out-Null;Start-Sleep -Milliseconds 120
+  }
   $g.CopyFromScreen([Drawing.Point]::new($r.Left,$r.Top),[Drawing.Point]::Empty,$b.Size)
   $b.Save((Join-Path $evidence "$name.png"),[Drawing.Imaging.ImageFormat]::Png)
   if($name -like '*panel*') {
@@ -75,11 +93,13 @@ function Screenshot([string]$name,[IntPtr]$h) {
   }
   if($name -like '*orb*') {
    foreach($p in @(@(0,0),@(($b.Width-1),0),@(0,($b.Height-1)),@(($b.Width-1),($b.Height-1)))) {
-    $c=$b.GetPixel($p[0],$p[1]);$bg=$backdrop.BackColor
-    if([Math]::Abs($c.R-$bg.R)+[Math]::Abs($c.G-$bg.G)+[Math]::Abs($c.B-$bg.B) -gt 8){throw 'Orb has a nontransparent square corner.'}
+    $c=$b.GetPixel($p[0],$p[1]);$bg=$underlay.GetPixel($p[0],$p[1])
+    if([Math]::Abs($c.R-$bg.R)+[Math]::Abs($c.G-$bg.G)+[Math]::Abs($c.B-$bg.B) -gt 8){throw "Orb corner ($($p[0]),$($p[1])) differs from the actual underlying desktop: $c versus $bg"}
    }
+   $center=$b.GetPixel([int]($b.Width/2),[int]($b.Height/2));$beneath=$underlay.GetPixel([int]($b.Width/2),[int]($b.Height/2))
+   if([Math]::Abs($center.R-$beneath.R)+[Math]::Abs($center.G-$beneath.G)+[Math]::Abs($center.B-$beneath.B) -lt 30){throw 'Orb is not visibly painted; corner equality alone is insufficient.'}
   }
- } finally {$g.Dispose();$b.Dispose()}
+ } finally {if($underlay){$underlay.Dispose()};$g.Dispose();$b.Dispose()}
 }
 try {
  Apply-TestTheme $false
