@@ -7,21 +7,23 @@
 <p align="center"><img src="public-assets/screenshots/todo-panel.png" width="49%" alt="macOS 版 Todo list 主界面"> <img src="public-assets/screenshots/windows-todo-panel.png" width="49%" alt="Windows 版 Todo list 主界面"></p>
 <p align="center"><sub>左：macOS · 右：Windows x64；Windows 图由 GitHub Windows runner 实际渲染，使用演示数据</sub></p>
 
-## Mac v2.0.3：修复首次新建输入焦点
+## Mac v2.0.4：菜单栏入口恢复与备用退出菜单
 
-**当前公开版本：macOS v2.0.3；Windows v2.0.1。** 本次只更新 Mac，Windows v2.0.2 仍是未完成客户端验收的 Draft，不包含在正式下载中。下表的 Windows 文件保留原版名称和内容，没有改名冒充新版。
+**当前公开版本：macOS v2.0.4；Windows v2.0.1。** 本次只更新 Mac，Windows v2.0.2 仍是未完成客户端验收的 Draft，不包含在正式下载中。下表的 Windows 文件保留原版名称和内容，没有改名冒充新版。
 
-Mac 修复首次点 ＋ 时，输入框尚未挂载或窗口尚未激活，旧的 180ms 聚焦重试就已经结束的问题。改为按原生窗口/控件生命周期聚焦，并保留中文组合文本；关闭输入框后不再留下抢焦点的回调。配色、布局和待办数据格式未改。
+- 菜单栏图标使用稳定的位置标识，首次优先靠右放置；恢复可见状态，并在系统符号不可用时显示「干」字，避免空白按钮。深浅背景仍由系统模板图自动适配。
+- **新增备用退出入口：右键卡片标题栏的空白处，或右键紫色「干」球 →「退出 贝卡の Todo list」。** 退出后，从“应用程序”双击 `LiquidTodo.app` 重新打开。
+- 保留 v2.0.3 的首次新建输入焦点修复；不改外观、Windows 源码和待办数据格式。
 
-已通过 22 项数据测试、5 项原生焦点/组合文本回归及 Intel / Apple 芯片双架构构建。**微信输入法的真实候选框/汉字提交未完成本机图形实测**，不把原生组件测试等同于第三方输入法验收。
+通过 22 项数据测试、9 项原生菜单栏检查、5 项原生焦点/组合文本回归及 Intel / Apple 芯片双架构构建。菜单栏检查验证 AppKit 配置、位置保留与缺图回退，并不保证系统在任意拥挤/刘海布局下始终展示图标；此时可用右键备用入口。**微信输入法的真实候选框/汉字提交未完成本机图形实测**，不把原生组件测试等同于第三方输入法验收。
 
 ## 选哪个下载？
 
 | 你的电脑 | 下载文件 | 适合谁 | 打开方式 |
 |---|---|---|---|
-| **Mac（Intel 或 Apple 芯片）** | [`LiquidTodo-macOS-universal-v2.0.3.zip`](https://github.com/lyyrebecca/beka-todo-list/releases/download/v2.0.3/LiquidTodo-macOS-universal-v2.0.3.zip) | 所有 Mac 用户 | 解压后把 `LiquidTodo.app` 拖进“应用程序”，双击打开。 |
-| **Windows 10 22H2 / Windows 11 x64** | [`LiquidTodo-Windows-x64-Setup-v2.0.1.exe`](https://github.com/lyyrebecca/beka-todo-list/releases/download/v2.0.3/LiquidTodo-Windows-x64-Setup-v2.0.1.exe) | 推荐，大多数 Windows 用户 | 双击安装器，按提示安装；可选桌面快捷方式与开机启动。 |
-| **Windows 10 22H2 / Windows 11 x64** | [`LiquidTodo-Windows-x64-Portable-v2.0.1.zip`](https://github.com/lyyrebecca/beka-todo-list/releases/download/v2.0.3/LiquidTodo-Windows-x64-Portable-v2.0.1.zip) | 不想安装、想放 U 盘 | 解压整个文件夹，双击 `LiquidTodo.exe`；首次启动会在同级创建 `Data/`，之后不要删除它。 |
+| **Mac（Intel 或 Apple 芯片）** | [`LiquidTodo-macOS-universal-v2.0.4.zip`](https://github.com/lyyrebecca/beka-todo-list/releases/download/v2.0.4/LiquidTodo-macOS-universal-v2.0.4.zip) | 所有 Mac 用户 | 解压后把 `LiquidTodo.app` 拖进“应用程序”，双击打开。 |
+| **Windows 10 22H2 / Windows 11 x64** | [`LiquidTodo-Windows-x64-Setup-v2.0.1.exe`](https://github.com/lyyrebecca/beka-todo-list/releases/download/v2.0.4/LiquidTodo-Windows-x64-Setup-v2.0.1.exe) | 推荐，大多数 Windows 用户 | 双击安装器，按提示安装；可选桌面快捷方式与开机启动。 |
+| **Windows 10 22H2 / Windows 11 x64** | [`LiquidTodo-Windows-x64-Portable-v2.0.1.zip`](https://github.com/lyyrebecca/beka-todo-list/releases/download/v2.0.4/LiquidTodo-Windows-x64-Portable-v2.0.1.zip) | 不想安装、想放 U 盘 | 解压整个文件夹，双击 `LiquidTodo.exe`；首次启动会在同级创建 `Data/`，之后不要删除它。 |
 
 > **Windows 版无需安装 .NET。** 若 SmartScreen 显示“未知发布者”，点击 **更多信息 → 仍要运行**；这是因为目前尚未使用 Authenticode 证书。只从 [Releases](../../releases/latest) 下载，并用 `SHA256SUMS.txt` 核对文件。
 
@@ -39,14 +41,14 @@ Mac 修复首次点 ＋ 时，输入框尚未挂载或窗口尚未激活，旧�
 
 适用 **macOS 14 或更新系统**，Intel / Apple 芯片共用同一份 Universal 包。
 
-1. 下载 `LiquidTodo-macOS-universal-v2.0.3.zip`。
+1. 下载 `LiquidTodo-macOS-universal-v2.0.4.zip`。
 2. 在 **访达 → 下载** 中双击 ZIP 解压，找到紫色图标的 **`LiquidTodo.app`**。如果浏览器已经自动解压，直接找这个 App，不用再次解压。
 3. 把 **整个 `LiquidTodo.app`** 拖到访达左侧的 **应用程序（Applications）**。
 4. 打开 **访达 → 应用程序 → `LiquidTodo.app`**，双击启动。系统隐藏 `.app` 扩展名时，可能只显示 `LiquidTodo`；中文显示名也可能是「贝卡の Todo list」。认准紫色应用图标即可。
 5. 首次启动设置自己的名称，随后点主面板右上方 **＋** 添加待办。
 
 ```text
-下载/LiquidTodo-macOS-universal-v2.0.3.zip
+下载/LiquidTodo-macOS-universal-v2.0.4.zip
     ↓ 双击解压，把整个 App 拖到“应用程序”
 应用程序/（Applications）
 └── LiquidTodo.app    ← 每次使用，双击这个紫色 App
@@ -98,7 +100,7 @@ D:\Apps\LiquidTodo\                  ← 示例：完整解压得到的文件夹
 ### 双击了，但找不到界面？
 
 - **Windows**：先看屏幕边缘的紫色「干」球，点一下展开；再看任务栏右下角，点 **⌃ 显示隐藏图标**，右键待办图标 → **显示 / 隐藏**。开机启动也可能以圆球或上次状态出现。
-- **Mac**：看屏幕边缘的「干」球，或屏幕顶部菜单栏的待办图标，选择显示/展开组件。不要因为 Dock 没出现常规窗口就重复启动。
+- **Mac**：看屏幕边缘的「干」球，或屏幕顶部菜单栏的待办图标，选择显示/展开组件。菜单栏图标被挤掉时，可右键卡片标题栏空白处或紫色圆球打开备用菜单，其中有退出入口；退出后双击“应用程序”里的 `LiquidTodo.app` 重开。不要因为 Dock 没出现常规窗口就重复启动。
 - **v2.0.1 已知问题**：Windows 悬浮球拖动后可能移出工作区，修复版 v2.0.2 正在客户端验收，尚未正式发布。旧版没有“找回窗口”菜单；不要把该候选版操作当作旧版已有功能。
 - 若任务管理器中进程出现后立即消失，不算启动成功；先确认完整解压，再参考本页末尾 **Windows Portable 无法启动？** 收集诊断日志。
 
@@ -112,6 +114,7 @@ D:\Apps\LiquidTodo\                  ← 示例：完整解压得到的文件夹
 
 - **编辑**：点击待办文字；标题、级别、日期、时间和提醒均可修改。
 - **排序**：拖动每条最右侧的 `⋮⋮` 手柄；重要 / 紧急项目创建后自动置顶。
+- **退出 / 重开（Mac）**：菜单栏待办图标 →「退出」，或右键卡片标题栏空白处 / 紫色圆球 →「退出」；重新双击“应用程序”中的 `LiquidTodo.app`。
 - **收起**：点 `−` 变为紫色「干」圆球，拖到屏幕边缘会自动吸附；点击圆球恢复。
 - **完成**：勾选后有 4 秒撤销窗口；完成历史可恢复或清空。
 - **备份**：托盘菜单中选择“导出备份 / 导入备份”。导入默认安全合并，按 UUID 去重，导入前自动备份本机数据。
@@ -143,7 +146,7 @@ D:\Apps\LiquidTodo\                  ← 示例：完整解压得到的文件夹
 
 ```bash
 # macOS
-./test.sh && ./build.sh
+./test.sh && ./Tests/run-status-item-tests.sh && ./build.sh
 
 # Windows（Windows x64 上）
 dotnet test windows/LiquidTodo.Windows.sln
@@ -162,6 +165,6 @@ Windows CI 会跑单元测试并构建自包含发布产物；最新通过记录
 .\LiquidTodo.exe --safe-mode --diagnostics
 ```
 
-它会跳过托盘、通知和桌面展示模式，只打开基础待办面板；启动错误会写入同级 `Data\Logs\startup-*.log`。请附上该日志与 Windows 版本信息提交 Issue。每个 Release 都包含 `manifest.json`（包内逐文件 SHA-256）及总文件 `SHA256SUMS.txt`，可用于确认下载完整性。
+它会跳过托盘、通知和桌面展示模式，只打开基础待办面板；启动错误会写入同级 `Data\Logs\startup-*.log`。请附上该日志与 Windows 版本信息提交 Issue。Windows 便携包内包含 `manifest.json`（包内逐文件 SHA-256），每个 Release 另提供总文件 `SHA256SUMS.txt`，可用于确认下载完整性。
 
 [MIT](LICENSE)
