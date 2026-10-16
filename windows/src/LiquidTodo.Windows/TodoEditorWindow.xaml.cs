@@ -25,7 +25,7 @@ public partial class TodoEditorWindow : Window
         EndInput.SelectedDate = schedule?.EndDate?.ToDateTime(TimeOnly.MinValue) ?? DateTime.Today.AddDays(1);
         var reminderMinute = schedule?.ReminderTimeMinutes ?? 1260;
         ReminderTimeInput.Text = $"{reminderMinute / 60:00}:{reminderMinute % 60:00}";
-        Loaded += (_, _) => { TodoTextBox.Focus(); TodoTextBox.SelectAll(); ConfigureReminderOptions(ParseEnum<TodoTimeMode>(ModeInput)); RefreshRows(); };
+        Loaded += (_, _) => { Services.NativeWindow.FitToWorkArea(this); TodoTextBox.Focus(); TodoTextBox.SelectAll(); ConfigureReminderOptions(ParseEnum<TodoTimeMode>(ModeInput)); RefreshRows(); };
     }
     private void ModeInput_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

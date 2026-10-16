@@ -16,9 +16,11 @@ public sealed class PersistenceService
             using var stream = File.OpenRead(DataFile);
             var snapshot = JsonSerializer.Deserialize<TodoSnapshot>(stream, LiquidTodoJson.Options)
                 ?? new TodoSnapshot([], []);
+            if (snapshot.Items is null || snapshot.Archived is null || snapshot.Items.Concat(snapshot.Archived).Any(x => x is null || x.Text is null))
+                throw new InvalidDataException("Todo JSON has missing or invalid collections.");
             return Normalize(snapshot);
         }
-        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is JsonException or IOException or InvalidDataException or UnauthorizedAccessException)
         {
             var corrupt = $"{DataFile}.corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
             try { File.Move(DataFile, corrupt); RecoveredCorruptFile = corrupt; } catch { /* retain original if isolation fails */ }

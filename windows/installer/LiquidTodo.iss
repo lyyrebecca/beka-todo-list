@@ -2,7 +2,7 @@
   #define MyAppName "贝卡の Todo list"
 #endif
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0.1"
+  #define MyAppVersion "2.0.2"
 #endif
 #define MyAppPublisher "lyyrebecca"
 #define MyAppExeName "LiquidTodo.exe"
@@ -18,6 +18,9 @@ OutputBaseFilename=LiquidTodo-Windows-x64-Setup-v{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=lowest
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+MinVersion=10.0.19045
 UninstallDisplayIcon={app}\{#MyAppExeName}
 [Files]
 Source: "..\publish\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion

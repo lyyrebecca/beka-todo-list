@@ -22,10 +22,15 @@ public static class ReminderEngine
             case TodoReminderMode.AtTime when schedule.Date is { } date:
                 Add("", date); break;
             case TodoReminderMode.DayBefore when schedule.Date is { } eventDate:
-                Add("-day-before", At(DateOnly.FromDateTime(eventDate.LocalDateTime.Date.AddDays(-1)), schedule.ReminderTimeMinutes)); break;
+                Add("-day-before", At(DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(eventDate, timeZone).Date.AddDays(-1)), schedule.ReminderTimeMinutes)); break;
             case TodoReminderMode.DailyDuringPeriod when schedule.StartDate is { } start && schedule.EndDate is { } end:
-                for (var day = start; day <= end && day.DayNumber - start.DayNumber < 60; day = day.AddDays(1))
+                var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, timeZone).Date);
+                var first = start > today ? start : today;
+                for (var offset = 0; offset < 60 && first.DayNumber + offset <= end.DayNumber; offset++)
+                {
+                    var day = first.AddDays(offset);
                     Add($"-daily-{day:yyyyMMdd}", At(day, schedule.ReminderTimeMinutes));
+                }
                 break;
         }
         return output;
@@ -35,7 +40,7 @@ public static class ReminderEngine
     {
         if (item.Schedule?.ReminderMode != TodoReminderMode.DailyDuringPeriod || item.Schedule.StartDate is not { } start || item.Schedule.EndDate is not { } end)
             return [$"{item.Id:D}", $"{item.Id:D}-day-before"];
-        return Enumerable.Range(0, Math.Min(60, end.DayNumber - start.DayNumber + 1))
+        return Enumerable.Range(0, Math.Max(0, Math.Min(60, end.DayNumber - start.DayNumber + 1)))
             .Select(i => $"{item.Id:D}-daily-{start.AddDays(i):yyyyMMdd}").ToArray();
     }
 }

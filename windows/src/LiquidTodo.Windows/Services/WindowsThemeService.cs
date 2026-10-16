@@ -1,12 +1,12 @@
 using Microsoft.Win32;
 using System.Windows.Media;
+using LiquidTodo.Core;
 
 namespace LiquidTodo.Windows.Services;
 
 internal static class WindowsThemeService
 {
     private const string PersonalizeKey = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
-
     public static bool IsDarkMode()
     {
         try
@@ -16,21 +16,18 @@ internal static class WindowsThemeService
         }
         catch { return false; }
     }
-
     public static void ApplyResources(bool dark)
     {
+        var p = AppearancePalette.For(dark);
         var resources = System.Windows.Application.Current.Resources;
-        resources["Ink"] = new SolidColorBrush(ColorFrom(dark ? "FFF4F0FF" : "FF29213B"));
-        resources["Muted"] = new SolidColorBrush(ColorFrom(dark ? "FFC4B8E8" : "FF786F8A"));
-        resources["SecondaryInk"] = new SolidColorBrush(ColorFrom(dark ? "FFD8D0EC" : "FF625B73"));
-        resources["Purple"] = new SolidColorBrush(ColorFrom(dark ? "FFB3A7FF" : "FF7B68EE"));
-        resources["Urgent"] = new SolidColorBrush(ColorFrom(dark ? "FFFF8296" : "FFCD5A70"));
-        resources["Important"] = new SolidColorBrush(ColorFrom(dark ? "FFFFD982" : "FFB88618"));
-        resources["GlassTint"] = new SolidColorBrush(ColorFrom(dark ? "A51E1831" : "50FFFFFF"));
-        resources["RowFill"] = new SolidColorBrush(ColorFrom(dark ? "664A3D6B" : "88FFFFFF"));
-        resources["GlassBorder"] = new SolidColorBrush(ColorFrom(dark ? "55FFFFFF" : "AFFFFFFF"));
-        resources["Surface"] = new SolidColorBrush(ColorFrom(dark ? "FF211B32" : "FFFAF8FF"));
+        foreach (var (key, hex) in new[] {
+            ("Ink", p.Ink), ("Muted", p.Muted), ("SecondaryInk", p.SecondaryInk),
+            ("Purple", p.Accent), ("AccentText", p.AccentText), ("AccentInk", p.AccentInk), ("Urgent", p.Urgent),
+            ("Important", p.Important), ("RowFill", p.RowFill), ("Surface", p.Surface),
+            ("InputFill", p.InputFill), ("InputBorder", p.InputBorder) })
+        {
+            var brush = new SolidColorBrush(ColorFrom(hex)); brush.Freeze(); resources[key] = brush;
+        }
     }
-
-    private static Color ColorFrom(string value) => (Color)ColorConverter.ConvertFromString("#" + value)!;
+    internal static Color ColorFrom(string hex) => (Color)ColorConverter.ConvertFromString("#" + hex)!;
 }
