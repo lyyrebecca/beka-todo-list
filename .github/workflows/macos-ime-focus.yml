@@ -2,7 +2,7 @@ name: macOS native initial input focus
 on:
   workflow_dispatch:
   pull_request:
-    paths: ["Sources/**", "Tests/IMEFocusTests.swift", "Tests/run-ime-focus-tests.sh", ".github/workflows/macos-ime-focus.yml"]
+    paths: ["Sources/**", "Tests/**", "Info.plist", "build.sh", "test.sh", ".github/workflows/macos-ime-focus.yml"]
 permissions: { contents: read }
 jobs:
   native-focus:
@@ -10,6 +10,12 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - name: Data and interaction regression
+        run: ./test.sh
+      - name: Native menu bar presentation regression
+        run: ./Tests/run-status-item-tests.sh
+      - name: Universal build and signature verification
+        run: ./build.sh
       - name: Native delayed attachment and no focus stealing regression
         run: ./Tests/run-ime-focus-tests.sh "$RUNNER_TEMP/ime-focus-evidence"
       - uses: actions/upload-artifact@v4
