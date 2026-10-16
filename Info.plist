@@ -4,33 +4,33 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>zh_CN</string>
+	<key>CFBundleDisplayName</key>
+	<string>贝卡の Todo list 🌟</string>
 	<key>CFBundleExecutable</key>
+	<string>LiquidTodo</string>
+	<key>CFBundleIconFile</key>
 	<string>LiquidTodo</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.beka.liquidtodo</string>
-	<key>CFBundleIconFile</key>
-	<string>LiquidTodo</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>贝卡の Todo list</string>
-	<key>CFBundleDisplayName</key>
-	<string>贝卡の Todo list 🌟</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.0.1</string>
+	<string>2.0.3</string>
 	<key>CFBundleVersion</key>
-	<string>21</string>
+	<string>2.0.3</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
-	<key>NSPrincipalClass</key>
-	<string>NSApplication</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 lyyrebecca</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
 </dict>
 </plist>

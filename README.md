@@ -7,13 +7,21 @@
 <p align="center"><img src="public-assets/screenshots/todo-panel.png" width="49%" alt="macOS 版 Todo list 主界面"> <img src="public-assets/screenshots/windows-todo-panel.png" width="49%" alt="Windows 版 Todo list 主界面"></p>
 <p align="center"><sub>左：macOS · 右：Windows x64；Windows 图由 GitHub Windows runner 实际渲染，使用演示数据</sub></p>
 
+## Mac v2.0.3：修复首次新建输入焦点
+
+**当前公开版本：macOS v2.0.3；Windows v2.0.1。** 本次只更新 Mac，Windows v2.0.2 仍是未完成客户端验收的 Draft，不包含在正式下载中。下表的 Windows 文件保留原版名称和内容，没有改名冒充新版。
+
+Mac 修复首次点 ＋ 时，输入框尚未挂载或窗口尚未激活，旧的 180ms 聚焦重试就已经结束的问题。改为按原生窗口/控件生命周期聚焦，并保留中文组合文本；关闭输入框后不再留下抢焦点的回调。配色、布局和待办数据格式未改。
+
+已通过 22 项数据测试、5 项原生焦点/组合文本回归及 Intel / Apple 芯片双架构构建。**微信输入法的真实候选框/汉字提交未完成本机图形实测**，不把原生组件测试等同于第三方输入法验收。
+
 ## 选哪个下载？
 
 | 你的电脑 | 下载文件 | 适合谁 | 打开方式 |
 |---|---|---|---|
-| **Mac（Intel 或 Apple 芯片）** | [`LiquidTodo-macOS-universal-v2.0.1.zip`](https://github.com/lyyrebecca/beka-todo-list/releases/download/v2.0.1/LiquidTodo-macOS-universal-v2.0.1.zip) | 所有 Mac 用户 | 解压后把 `LiquidTodo.app` 拖进“应用程序”，双击打开。 |
-| **Windows 10 22H2 / Windows 11 x64** | [`LiquidTodo-Windows-x64-Setup-v2.0.1.exe`](https://github.com/lyyrebecca/beka-todo-list/releases/download/v2.0.1/LiquidTodo-Windows-x64-Setup-v2.0.1.exe) | 推荐，大多数 Windows 用户 | 双击安装器，按提示安装；可选桌面快捷方式与开机启动。 |
-| **Windows 10 22H2 / Windows 11 x64** | [`LiquidTodo-Windows-x64-Portable-v2.0.1.zip`](https://github.com/lyyrebecca/beka-todo-list/releases/download/v2.0.1/LiquidTodo-Windows-x64-Portable-v2.0.1.zip) | 不想安装、想放 U 盘 | 解压整个文件夹，双击 `LiquidTodo.exe`；首次启动会在同级创建 `Data/`，之后不要删除它。 |
+| **Mac（Intel 或 Apple 芯片）** | [`LiquidTodo-macOS-universal-v2.0.3.zip`](https://github.com/lyyrebecca/beka-todo-list/releases/download/v2.0.3/LiquidTodo-macOS-universal-v2.0.3.zip) | 所有 Mac 用户 | 解压后把 `LiquidTodo.app` 拖进“应用程序”，双击打开。 |
+| **Windows 10 22H2 / Windows 11 x64** | [`LiquidTodo-Windows-x64-Setup-v2.0.1.exe`](https://github.com/lyyrebecca/beka-todo-list/releases/download/v2.0.3/LiquidTodo-Windows-x64-Setup-v2.0.1.exe) | 推荐，大多数 Windows 用户 | 双击安装器，按提示安装；可选桌面快捷方式与开机启动。 |
+| **Windows 10 22H2 / Windows 11 x64** | [`LiquidTodo-Windows-x64-Portable-v2.0.1.zip`](https://github.com/lyyrebecca/beka-todo-list/releases/download/v2.0.3/LiquidTodo-Windows-x64-Portable-v2.0.1.zip) | 不想安装、想放 U 盘 | 解压整个文件夹，双击 `LiquidTodo.exe`；首次启动会在同级创建 `Data/`，之后不要删除它。 |
 
 > **Windows 版无需安装 .NET。** 若 SmartScreen 显示“未知发布者”，点击 **更多信息 → 仍要运行**；这是因为目前尚未使用 Authenticode 证书。只从 [Releases](../../releases/latest) 下载，并用 `SHA256SUMS.txt` 核对文件。
 
@@ -31,14 +39,14 @@
 
 适用 **macOS 14 或更新系统**，Intel / Apple 芯片共用同一份 Universal 包。
 
-1. 下载 `LiquidTodo-macOS-universal-v2.0.1.zip`。
+1. 下载 `LiquidTodo-macOS-universal-v2.0.3.zip`。
 2. 在 **访达 → 下载** 中双击 ZIP 解压，找到紫色图标的 **`LiquidTodo.app`**。如果浏览器已经自动解压，直接找这个 App，不用再次解压。
 3. 把 **整个 `LiquidTodo.app`** 拖到访达左侧的 **应用程序（Applications）**。
 4. 打开 **访达 → 应用程序 → `LiquidTodo.app`**，双击启动。系统隐藏 `.app` 扩展名时，可能只显示 `LiquidTodo`；中文显示名也可能是「贝卡の Todo list」。认准紫色应用图标即可。
 5. 首次启动设置自己的名称，随后点主面板右上方 **＋** 添加待办。
 
 ```text
-下载/LiquidTodo-macOS-universal-v2.0.1.zip
+下载/LiquidTodo-macOS-universal-v2.0.3.zip
     ↓ 双击解压，把整个 App 拖到“应用程序”
 应用程序/（Applications）
 └── LiquidTodo.app    ← 每次使用，双击这个紫色 App
