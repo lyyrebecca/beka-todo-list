@@ -116,6 +116,22 @@ function Invoke-Button($element) {
     [UiPointer]::mouse_event(4,0,0,0,[UIntPtr]::Zero)
 }
 
+function Assert-InitialKeyboardFocus($window, [string]$id) {
+    # MUST run before Set-Text/SetFocus: those helpers would hide a first-open bug.
+    # This checks real keyboard focus, NOT Chinese IME composition/candidates.
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    do {
+        $field = Find-ElementById $window $id
+        if ($field -and $field.Current.HasKeyboardFocus) {
+            Write-Host "Initial keyboard focus passed without UIA SetFocus: $id"
+            return
+        }
+        Start-Sleep -Milliseconds 100
+    } while ($clock.Elapsed.TotalSeconds -lt 5)
+    $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+    throw "First-open keyboard focus missing: $id; actual=$($focused.Current.AutomationId) / $($focused.Current.ControlType.ProgrammaticName)"
+}
+
 function Set-Text($element, [string]$value) {
     $pattern = $null
     if (-not $element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) {
@@ -260,6 +276,7 @@ try {
     # Some Windows hosted-runner UIA providers expose owned WPF dialogs with an
     # empty Window.Name. Find those by their stable control AutomationId instead.
     $welcome = Wait-WindowContainingElementId 'OwnerNameInput'
+    Assert-InitialKeyboardFocus $welcome 'OwnerNameInput'
     Set-Text (Wait-ElementById $welcome 'OwnerNameInput') 'Windows验收'
     Invoke-Button (Wait-ElementByName $welcome '保存' ([System.Windows.Automation.ControlType]::Button))
 
@@ -281,6 +298,7 @@ try {
     $main = Wait-WindowContainingElementId 'AddTodoButton'
     Invoke-Button (Wait-ElementById $main 'AddTodoButton')
     $editor = Wait-WindowContainingElementId 'TodoTextBox'
+    Assert-InitialKeyboardFocus $editor 'TodoTextBox'
     Set-Text (Wait-ElementById $editor 'TodoTextBox') 'Windows 中文输入与编辑验收'
     Select-Combo $editor 'PriorityInput' '重要 🌟'
     Select-Combo $editor 'ModeInput' '截止日期'
@@ -297,6 +315,7 @@ try {
 
     Invoke-Button (Wait-ElementByName $main '编辑待办' ([System.Windows.Automation.ControlType]::Button))
     $editor = Wait-WindowContainingElementId 'TodoTextBox'
+    Assert-InitialKeyboardFocus $editor 'TodoTextBox'
     Set-Text (Wait-ElementById $editor 'TodoTextBox') 'Windows 中文输入编辑完成'
     Select-Combo $editor 'ModeInput' '期间'
     Set-Text (Wait-ElementById $editor 'StartInput') ([DateTime]::Today.AddDays(2).ToString('yyyy-MM-dd'))
@@ -313,6 +332,7 @@ try {
 
     Invoke-Button (Wait-ElementByName $main '编辑待办' ([System.Windows.Automation.ControlType]::Button))
     $editor = Wait-WindowContainingElementId 'TodoTextBox'
+    Assert-InitialKeyboardFocus $editor 'TodoTextBox'
     Select-Combo $editor 'ModeInput' '某一天'
     Set-Text (Wait-ElementById $editor 'DateInput') ([DateTime]::Today.AddDays(4).ToString('yyyy-MM-dd'))
     (Wait-ElementById $editor 'TodoTextBox').SetFocus()
@@ -324,6 +344,7 @@ try {
     if ($day.schedule.mode -ne 'Day' -or $day.schedule.reminderMode -ne 'AtTime' -or [DateTimeOffset]::Parse($day.schedule.date).LocalDateTime.Hour -ne 10) { throw 'Day mode editing did not persist.' }
     Invoke-Button (Wait-ElementByName $main '编辑待办' ([System.Windows.Automation.ControlType]::Button))
     $editor = Wait-WindowContainingElementId 'TodoTextBox'
+    Assert-InitialKeyboardFocus $editor 'TodoTextBox'
     Select-Combo $editor 'ModeInput' '无时间'
     Invoke-Button (Wait-ElementByName $editor '保存' ([System.Windows.Automation.ControlType]::Button))
     $main = Wait-WindowContainingElementId 'AddTodoButton'
