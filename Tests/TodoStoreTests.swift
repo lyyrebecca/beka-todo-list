@@ -26,6 +26,9 @@ struct TodoStoreTests {
         try testScheduleModesAndPriority(root)
         try testCompleteUndoArchiveAndRestore(root)
         try testCompletedItemMigration(root)
+        try testHierarchyAndBackups(root)
+        try testHierarchyCompletion(root)
+        try testMeasuredReorderPreview(root)
         print("✅ TodoStore tests: \(passed) assertions passed")
     }
 
@@ -175,6 +178,108 @@ struct TodoStoreTests {
         let store = makeStore(url, scheduler: FakeNotificationScheduler())
         check(store.items.isEmpty && store.archived.first?.id == completed.id,
               "退出发生在延迟归档期间时，重启会迁移到已完成记录")
+    }
+
+    @MainActor
+    private static func testHierarchyAndBackups(_ root: URL) throws {
+        let store = makeStore(root.appendingPathComponent("tree.json"), scheduler: FakeNotificationScheduler())
+        let a = store.add(text: "项目 A", priority: .normal, schedule: nil)!
+        let b = store.add(text: "项目 B", priority: .normal, schedule: nil)!
+        let a1 = store.add(text: "步骤 A1", priority: .normal, schedule: nil, parentId: a)!
+        let a2 = store.add(text: "步骤 A2", priority: .important, schedule: nil, parentId: a)!
+        let leaf = store.add(text: "继续拆分", priority: .normal, schedule: nil, parentId: a1)!
+        check(store.items.map(\.id) == [a, a2, a1, leaf, b], "子项优先级只影响同级，树保持连续")
+        check(store.depth(of: leaf) == 2, "支持递归拆分，不限于两层清单")
+        check(store.add(text: "无效父项", priority: .normal, schedule: nil, parentId: UUID()) == nil, "拒绝把新子项加入不存在的父项")
+        check(!store.setParent(a, to: leaf), "不能把父项移入自己的后代，防止循环")
+        check(!store.setParent(a1, to: a1), "不能把自己设为父项")
+        store.moveSibling(id: a1, to: 0)
+        check(store.items.map(\.id) == [a, a1, leaf, a2, b], "同级拖动带着完整子树移动")
+        store.moveSibling(id: a, to: 1)
+        check(store.items.map(\.id) == [b, a, a1, leaf, a2], "父待办排序不会遗留子项")
+        check(store.setParent(a1, to: b), "可以把子树改挂到另一个父待办")
+        check(store.items.first(where: { $0.id == leaf })?.parentId == a1, "改挂时保留孙级关系")
+        check(store.setParent(a1, to: nil) && store.depth(of: leaf) == 1, "提升为顶级时保留整棵子树")
+        store.toggleChildren(a1)
+        check(!store.visibleItems.contains(where: { $0.id == leaf }), "折叠隐藏后代但不删除数据")
+        store.toggleChildren(a1)
+        check(store.visibleItems.contains(where: { $0.id == leaf }), "展开恢复所有可见后代")
+        let backup = root.appendingPathComponent("tree-backup.json")
+        try store.exportBackup(to: backup)
+        let exportedDocument = try JSONDecoder().decode(TodoBackupDocument.self, from: Data(contentsOf: backup))
+        check(exportedDocument.schemaVersion == 2, "层级备份使用 v2，避免旧版静默丢失父子关系")
+        let restored = makeStore(root.appendingPathComponent("tree-import.json"), scheduler: FakeNotificationScheduler())
+        try restored.importBackup(from: backup, replacing: false)
+        check(restored.items.first(where: { $0.id == leaf })?.parentId == a1, "跨平台备份往返保留 parentId")
+        let loaded = makeStore(root.appendingPathComponent("tree.json"), scheduler: FakeNotificationScheduler())
+        check(loaded.items == store.items, "重启后层级、同级顺序和文本不变")
+        let flat = makeStore(root.appendingPathComponent("flat-compatible.json"), scheduler: FakeNotificationScheduler())
+        flat.add(text: "旧版仍能读取的平面清单", due: nil)
+        let flatURL = root.appendingPathComponent("flat-v1.json")
+        try flat.exportBackup(to: flatURL)
+        let flatDocument = try JSONDecoder().decode(TodoBackupDocument.self, from: Data(contentsOf: flatURL))
+        check(flatDocument.schemaVersion == 1,
+              "无层级备份继续输出 v1，保持旧版双端兼容")
+        try restored.importBackup(from: flatURL, replacing: false)
+        check(restored.items.contains(where: { $0.text == "旧版仍能读取的平面清单" }), "新版可合并导入旧 v1 备份")
+        var x = TodoItem(text: "循环 X"), y = TodoItem(text: "循环 Y")
+        x.parentId = y.id; y.parentId = x.id
+        let repaired = TodoHierarchy.sanitized([x, y, TodoItem(text: "孤儿", parentId: UUID())])
+        check(repaired.last?.parentId == nil, "损坏备份中的孤儿恢复为顶级，不丢内容")
+        check(TodoHierarchy.ordered(repaired).count == 3 && repaired.filter { $0.parentId == nil }.count >= 2,
+              "坏数据循环可确定性修复且所有待办仍可见")
+    }
+
+    @MainActor
+    private static func testMeasuredReorderPreview(_ root: URL) throws {
+        let url = root.appendingPathComponent("drag-preview.json")
+        let store = makeStore(url, scheduler: FakeNotificationScheduler())
+        let a = store.add(text: "短行", priority: .normal, schedule: nil)!
+        let b = store.add(text: "两行长标题", priority: .normal, schedule: nil)!
+        let c = store.add(text: "第三行", priority: .normal, schedule: nil)!
+        let frames: [UUID: CGRect] = [a: CGRect(x: 0, y: 0, width: 350, height: 32),
+            b: CGRect(x: 0, y: 38, width: 350, height: 62), c: CGRect(x: 0, y: 106, width: 350, height: 44)]
+        store.updateRowFrames(frames)
+        let before = try Data(contentsOf: url)
+        store.beginRowDrag(a)
+        for y in 0...140 { store.updateRowDrag(translation: CGFloat(y)) }
+        check(store.items.map(\.id) == [a, b, c], "拖动预览不会反复改写列表和重建输入控件")
+        let duringDrag = try Data(contentsOf: url)
+        check(duringDrag == before, "每次鼠标移动不做磁盘写入")
+        check(store.reorderPreview?.targetSiblingIndex == 2, "按真实不等高行计算目标，而非写死 45px")
+        check(store.reorderPreview?.offsets[b] == -38 && store.reorderPreview?.offsets[c] == -38,
+              "相邻行实时让位，长标题不影响间隙")
+        store.finishRowDrag()
+        check(store.items.map(\.id) == [b, c, a] && store.reorderPreview == nil, "松手一次提交实际排序并清理手势状态")
+        let saved = try Data(contentsOf: url)
+        store.updateRowFrames(frames)
+        store.beginRowDrag(b); store.updateRowDrag(translation: 200); store.finishRowDrag(cancelled: true)
+        let afterCancel = try Data(contentsOf: url)
+        check(afterCancel == saved && store.items.map(\.id) == [b, c, a], "取消拖动不落盘、不改变原有顺序")
+    }
+
+    @MainActor
+    private static func testHierarchyCompletion(_ root: URL) throws {
+        let store = makeStore(root.appendingPathComponent("tree-completion.json"), scheduler: FakeNotificationScheduler(), delay: 0.05)
+        let parent = store.add(text: "父项", priority: .normal, schedule: nil)!
+        let child = store.add(text: "子项", priority: .normal, schedule: nil, parentId: parent)!
+        let grandchild = store.add(text: "孙项", priority: .normal, schedule: nil, parentId: child)!
+        store.complete(parent)
+        check(store.items.allSatisfy(\.completed), "完成父项会完成所有后代")
+        store.undoCompletion(child)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        check(store.items.count == 3 && store.items.allSatisfy { !$0.completed } && store.archived.isEmpty,
+              "四秒撤销对整个完成分组生效，不留下半归档树")
+        store.complete(parent)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        check(store.items.isEmpty && store.archived.map(\.id) == [parent, child, grandchild], "整棵子树按层级归档")
+        store.restoreArchived(parent)
+        check(store.archived.isEmpty && store.items.map(\.id) == [parent, child, grandchild], "恢复父项会恢复子树和顺序")
+        store.complete(grandchild)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        check(store.childProgress(parent).done == 1 && store.childProgress(parent).total == 2, "父项进度包括已归档的完成子项")
+        store.delete(parent)
+        check(store.items.isEmpty && store.archived.isEmpty, "删除父项连同活动和已完成后代一起清理")
     }
 
     private static func check(_ condition: @autoclosure () -> Bool, _ message: String) {

@@ -1,6 +1,13 @@
 import SwiftUI
 import AppKit
 
+struct TodoRowFramesKey: PreferenceKey {
+    static var defaultValue: [UUID: CGRect] = [:]
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, latest in latest })
+    }
+}
+
 struct WidgetView: View {
     @ObservedObject var store: TodoStore
     var onSizeChange: (CGSize) -> Void
@@ -11,10 +18,11 @@ struct WidgetView: View {
     var onRequestTextInput: () -> Void
     var onTextInputSessionChanged: (Bool) -> Void
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reducesMotion
 
     private var dark: Bool { scheme == .dark }
     private var shownItems: [TodoItem] {
-        store.isExpanded ? store.items : Array(store.items.prefix(store.maxVisible))
+        store.isExpanded ? store.visibleItems : Array(store.visibleItems.prefix(store.maxVisible))
     }
 
     var body: some View {
@@ -26,6 +34,7 @@ struct WidgetView: View {
             }
         }
         .onChange(of: store.isAdding) { _, isAdding in
+            if !isAdding { store.addingParentId = nil }
             onTextInputSessionChanged(isAdding || store.editingTextId != nil)
         }
         .onChange(of: store.editingTextId) { _, editingId in
@@ -38,6 +47,7 @@ struct WidgetView: View {
         )
         .onPreferenceChange(ContentSizeKey.self) { onSizeChange($0) }
         .onPreferenceChange(HeaderControlFramesKey.self) { onHeaderControlFramesChange($0) }
+        .onPreferenceChange(TodoRowFramesKey.self) { store.updateRowFrames($0) }
         .sheet(isPresented: $store.isShowingNameSetup) { NameSetupView(store: store) }
         .transition(.opacity.combined(with: .scale(scale: 0.94)))
         // 临界阻尼，避免缩小/恢复时出现“果冻式”二次回弹。
@@ -62,7 +72,7 @@ struct WidgetView: View {
             }
             if store.isAdding && !store.isShowingArchive {
                 AddRowView(store: store, dark: dark, onRequestTextInput: onRequestTextInput)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                    .transition(.opacity)
             }
         }
         .padding(15)
@@ -82,7 +92,8 @@ struct WidgetView: View {
                 .allowsHitTesting(false)
         )
         .padding(6)
-        .animation(.spring(response: 0.38, dampingFraction: 0.88, blendDuration: 0.08), value: store.items)
+        .animation(reducesMotion ? nil : .spring(response: 0.24, dampingFraction: 0.92), value: store.items)
+        .animation(reducesMotion ? nil : .easeInOut(duration: 0.18), value: store.collapsedIds)
         .animation(.spring(response: 0.30, dampingFraction: 0.90, blendDuration: 0.05), value: store.isAdding)
         .animation(.spring(response: 0.30, dampingFraction: 0.90, blendDuration: 0.05), value: store.isExpanded)
     }
@@ -201,7 +212,7 @@ struct WidgetView: View {
             .help("最小化为屏幕右侧圆圈")
             headerControl(action: {
                 let willAdd = !store.isAdding
-                if willAdd { onRequestTextInput() }
+                if willAdd { store.addingParentId = nil; onRequestTextInput() }
                 store.isAdding = willAdd
                 store.isShowingArchive = false
                 if willAdd { store.isExpanded = false }
@@ -236,12 +247,24 @@ struct WidgetView: View {
                 .foregroundStyle(Theme.textSecondary(dark))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-        } else if store.isExpanded && store.items.count > store.maxVisible {
+        } else if store.isAdding {
+            // Reserve stable on-screen space for the native input client. Ten
+            // rows plus a reminder form must not push it below the desktop.
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(spacing: 6) {
+                    ForEach(Array(shownItems.enumerated()), id: \.element.id) { index, item in
+                        TodoRowView(item: item, store: store, dark: dark,
+                                    index: index, count: shownItems.count)
+                    }
+                }
+            }
+            .frame(maxHeight: 140)
+        } else if store.isExpanded && store.visibleItems.count > store.maxVisible {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 6) {
-                    ForEach(Array(store.items.enumerated()), id: \.element.id) { index, item in
+                    ForEach(Array(store.visibleItems.enumerated()), id: \.element.id) { index, item in
                         TodoRowView(item: item, store: store, dark: dark,
-                                    index: index, count: store.items.count)
+                                    index: index, count: store.visibleItems.count)
                     }
                 }
             }
@@ -273,7 +296,7 @@ struct WidgetView: View {
                 .buttonStyle(.plain)
             }
         }
-        if store.isExpanded && store.items.count > store.maxVisible {
+        if store.isExpanded && store.visibleItems.count > store.maxVisible {
             Button {
                 store.isExpanded = false
             } label: {
@@ -335,6 +358,7 @@ struct WidgetView: View {
                         .padding(.vertical, 7)
                         .background(RoundedRectangle(cornerRadius: 13, style: .continuous)
                             .fill(Theme.rowFill(dark)))
+                        .padding(.leading, CGFloat(min(TodoHierarchy.depth(of: item.id, in: store.archived), 4)) * 12)
                     }
                 }
             }
@@ -364,14 +388,56 @@ struct TodoRowView: View {
     let dark: Bool
     let index: Int
     let count: Int
-    @State private var dragOffset: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reducesMotion
+    @State private var confirmingSubtreeDeletion = false
 
     private var overdue: Bool { store.isOverdue(item) }
     private var isDragging: Bool { store.draggingId == item.id }
-    private static let rowStride: CGFloat = 45
+    private var dragOffset: CGFloat { store.reorderPreview?.offsets[item.id] ?? 0 }
+    private var inDraggedSubtree: Bool { store.isInDraggingSubtree(item.id) }
 
     var body: some View {
+        surface
+            .opacity(store.reorderPreview == nil ? 1 : 0)
+            .overlay(alignment: .topLeading) {
+                if store.reorderPreview != nil {
+                    surface.offset(y: dragOffset)
+                        .animation(inDraggedSubtree || reducesMotion ? nil : .interactiveSpring(response: 0.22, dampingFraction: 0.94), value: dragOffset)
+                        .allowsHitTesting(false)
+                }
+            }
+            // Measure the untransformed placeholder, never the moving drawing.
+            .background(GeometryReader { proxy in
+                Color.clear.preference(key: TodoRowFramesKey.self, value: [item.id: proxy.frame(in: .global)])
+            })
+            .zIndex(inDraggedSubtree ? 10 : 0)
+            .contextMenu { rowMenu }
+            .popover(isPresented: Binding(
+                get: { store.editingTextId == item.id },
+                set: { if !$0 { store.editingTextId = nil } }
+            )) { TodoEditorView(item: item, store: store) }
+            .confirmationDialog("删除待办及所有子项？", isPresented: $confirmingSubtreeDeletion) {
+                Button("删除待办及所有子项", role: .destructive) { store.delete(item.id) }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("这会同时删除其活动与已完成子项，不能撤销。")
+            }
+            .onDisappear {
+                if isDragging { store.finishRowDrag(cancelled: true) }
+            }
+    }
+
+    private var surface: some View {
         HStack(spacing: 9) {
+            if store.items.contains(where: { $0.parentId == item.id }) {
+                Button { store.toggleChildren(item.id) } label: {
+                    Image(systemName: store.collapsedIds.contains(item.id) ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .frame(width: 15, height: 24)
+                }
+                .buttonStyle(.plain)
+                .help(store.collapsedIds.contains(item.id) ? "展开子待办" : "收起子待办")
+            }
             checkButton
             if item.priority != .normal {
                 Image(systemName: item.priority == .urgent ? "exclamationmark.2" : "star.fill")
@@ -388,10 +454,18 @@ struct TodoRowView: View {
                                  ? Theme.textSecondary(dark)
                                  : Theme.textPrimary(dark))
                 .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
                 .contentShape(Rectangle())
                 .onTapGesture { beginEditing() }
                 .help("点按编辑内容和截止时间")
             Spacer(minLength: 4)
+            if store.hasChildren(item.id) {
+                let progress = store.childProgress(item.id)
+                Text("\(progress.done)/\(progress.total)")
+                    .font(.system(size: 10, design: .rounded).monospacedDigit())
+                    .foregroundStyle(Theme.textSecondary(dark))
+                    .help("子待办完成进度")
+            }
             if let schedule = item.schedule {
                 scheduleLabel(schedule)
                     .contentShape(Rectangle())
@@ -415,23 +489,40 @@ struct TodoRowView: View {
             RoundedRectangle(cornerRadius: 13, style: .continuous)
                 .fill(item.completed ? Color.clear : Theme.rowFill(dark))
         )
+        .padding(.leading, CGFloat(min(store.depth(of: item.id), 4)) * 12)
         .opacity(item.completed ? 0.45 : 1)
-        .offset(y: isDragging ? dragOffset : 0)
-        .zIndex(isDragging ? 10 : 0)
-        .contextMenu {
+    }
+
+    @ViewBuilder private var rowMenu: some View {
             Button("编辑待办…") { beginEditing() }
+            Button("添加子待办") {
+                store.addingParentId = item.id
+                store.isShowingArchive = false
+                store.isAdding = true
+                store.isExpanded = true
+                store.collapsedIds.remove(item.id)
+            }.disabled(item.completed)
+            if let parent = item.parentId {
+                Button("提升一级") {
+                    store.setParent(item.id, to: store.items.first(where: { $0.id == parent })?.parentId)
+                }
+            }
+            Menu("移动到…") {
+                Button("顶级待办") { store.setParent(item.id, to: nil) }
+                ForEach(store.items.filter { !$0.completed && !TodoHierarchy.descendantIDs(of: item.id, in: store.items).contains($0.id) }) { parent in
+                    Button(String(repeating: "  ", count: min(store.depth(of: parent.id), 4)) + parent.text) {
+                        store.setParent(item.id, to: parent.id)
+                    }
+                }
+            }
             if item.dueDate != nil {
                 Button("清除截止时间") { store.setDue(item.id, nil) }
             }
             Divider()
-            Button("删除", role: .destructive) { store.delete(item.id) }
-        }
-        .popover(isPresented: Binding(
-            get: { store.editingTextId == item.id },
-            set: { if !$0 { store.editingTextId = nil } }
-        )) {
-            TodoEditorView(item: item, store: store)
-        }
+            Button(store.hasChildren(item.id) ? "删除待办及子项" : "删除", role: .destructive) {
+                if store.hasChildren(item.id) { confirmingSubtreeDeletion = true }
+                else { store.delete(item.id) }
+            }
     }
 
     private func beginEditing() {
@@ -451,21 +542,14 @@ struct TodoRowView: View {
     }
 
     private var reorderGesture: some Gesture {
-        DragGesture(minimumDistance: 4)
+        DragGesture(minimumDistance: 4, coordinateSpace: .global)
             .onChanged { value in
-                if store.draggingId == nil { store.draggingId = item.id }
-                let minY = -CGFloat(index) * Self.rowStride
-                let maxY = CGFloat(count - 1 - index) * Self.rowStride
-                dragOffset = min(max(value.translation.height, minY), maxY)
+                if store.draggingId == nil { store.beginRowDrag(item.id) }
+                store.updateRowDrag(translation: value.translation.height)
             }
             .onEnded { _ in
-                let steps = Int((dragOffset / Self.rowStride).rounded())
-                store.draggingId = nil
-                if steps != 0 {
-                    dragOffset = 0
-                    store.moveItem(id: item.id, to: index + steps)
-                } else {
-                    withAnimation(.spring(response: 0.24, dampingFraction: 0.90)) { dragOffset = 0 }
+                withAnimation(reducesMotion ? nil : .spring(response: 0.22, dampingFraction: 0.94)) {
+                    store.finishRowDrag()
                 }
             }
     }
@@ -663,15 +747,27 @@ struct AddRowView: View {
     @ObservedObject var store: TodoStore
     let dark: Bool
     @State private var draft = TodoDraft()
+    @State private var focusRequest = UUID()
     var onRequestTextInput: () -> Void
 
     var body: some View {
         VStack(spacing: 11) {
+            if let id = store.addingParentId, let parent = store.items.first(where: { $0.id == id }) {
+                HStack {
+                    Label("拆分：\(parent.text)", systemImage: "arrow.turn.down.right")
+                        .lineLimit(1)
+                    Spacer()
+                    Button("改为顶级") { store.addingParentId = nil }
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.textSecondary(dark))
+            }
             IMETextField(text: $draft.text,
                          placeholder: "写下新待办…",
                          font: .systemFont(ofSize: 13),
                          textColor: .labelColor,
-                         roundedBorder: false)
+                         roundedBorder: false,
+                         focusRequest: focusRequest)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -700,14 +796,17 @@ struct AddRowView: View {
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
             .fill(Theme.rowFill(dark)))
         .onAppear { onRequestTextInput() }
+        .onChange(of: store.addingParentId) { _, _ in focusRequest = UUID() }
         .onExitCommand { store.isAdding = false }
     }
 
     private func commit() {
         let trimmed = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        store.add(text: trimmed, priority: draft.priority, schedule: draft.schedule)
+        guard store.add(text: trimmed, priority: draft.priority, schedule: draft.schedule,
+                        parentId: store.addingParentId) != nil else { return }
         draft = TodoDraft()
+        focusRequest = UUID()
         onRequestTextInput()
     }
 }
