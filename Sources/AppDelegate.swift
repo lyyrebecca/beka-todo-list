@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.mainMenu = ApplicationMenu.make(target: self, newAction: #selector(startAdding), quitAction: #selector(quit))
         if ProcessInfo.processInfo.environment["LIQUIDTODO_SANDBOX"] != "1" {
             UNUserNotificationCenter.current()
                 .requestAuthorization(options: [.alert, .sound]) { _, _ in }
