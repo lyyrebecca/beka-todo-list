@@ -429,7 +429,7 @@ struct TodoRowView: View {
 
     private var surface: some View {
         HStack(spacing: 9) {
-            if store.items.contains(where: { $0.parentId == item.id }) {
+            if store.hasActiveChildren(item.id) {
                 Button { store.toggleChildren(item.id) } label: {
                     Image(systemName: store.collapsedIds.contains(item.id) ? "chevron.right" : "chevron.down")
                         .font(.system(size: 10, weight: .semibold))
@@ -509,7 +509,7 @@ struct TodoRowView: View {
             }
             Menu("移动到…") {
                 Button("顶级待办") { store.setParent(item.id, to: nil) }
-                ForEach(store.items.filter { !$0.completed && !TodoHierarchy.descendantIDs(of: item.id, in: store.items).contains($0.id) }) { parent in
+                ForEach(availableParents) { parent in
                     Button(String(repeating: "  ", count: min(store.depth(of: parent.id), 4)) + parent.text) {
                         store.setParent(item.id, to: parent.id)
                     }
@@ -527,6 +527,11 @@ struct TodoRowView: View {
 
     private func beginEditing() {
         store.editingTextId = item.id
+    }
+
+    private var availableParents: [TodoItem] {
+        let excluded = TodoHierarchy.descendantIDs(of: item.id, in: store.items)
+        return store.items.filter { !$0.completed && !excluded.contains($0.id) }
     }
 
     private var handle: some View {
@@ -617,9 +622,7 @@ struct TodoRowView: View {
             return schedule.date.map(format) ?? "某一天"
         case .period:
             guard let start = schedule.startDate, let end = schedule.endDate else { return "期间" }
-            let formatter = DateFormatter()
-            formatter.dateFormat = "M/d"
-            var result = formatter.string(from: start) + "–" + formatter.string(from: end)
+            var result = monthDayFormatter.string(from: start) + "–" + monthDayFormatter.string(from: end)
             if schedule.reminderMode == .dailyDuringPeriod {
                 result += String(format: " 每天%02d:%02d",
                                  schedule.reminderTimeMinutes / 60,
@@ -631,13 +634,20 @@ struct TodoRowView: View {
 
     static func format(_ date: Date) -> String {
         let cal = Calendar.current
-        let hm = DateFormatter()
-        hm.dateFormat = "HH:mm"
-        if cal.isDateInToday(date) { return "今天 " + hm.string(from: date) }
-        if cal.isDateInTomorrow(date) { return "明天 " + hm.string(from: date) }
-        let md = DateFormatter()
-        md.dateFormat = "M月d日"
-        return md.string(from: date)
+        if cal.isDateInToday(date) { return "今天 " + timeFormatter.string(from: date) }
+        if cal.isDateInTomorrow(date) { return "明天 " + timeFormatter.string(from: date) }
+        return longDateFormatter.string(from: date)
+    }
+
+    private static let timeFormatter = makeFormatter("HH:mm")
+    private static let monthDayFormatter = makeFormatter("M/d")
+    private static let longDateFormatter = makeFormatter("M月d日")
+    private static func makeFormatter(_ format: String) -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.dateFormat = format
+        return formatter
     }
 }
 

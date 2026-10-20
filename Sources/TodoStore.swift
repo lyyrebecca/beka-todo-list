@@ -35,8 +35,16 @@ struct TodoReminderRequest: Equatable {
 
 @MainActor
 final class TodoStore: ObservableObject {
-    @Published var items: [TodoItem] = []
-    @Published var archived: [TodoItem] = []
+    @Published var items: [TodoItem] = [] { didSet { presentationCache = nil } }
+    @Published var archived: [TodoItem] = [] { didSet { presentationCache = nil } }
+    private var presentationCache: TodoHierarchyPresentation?
+    private(set) var presentationBuildCount = 0
+    private var presentation: TodoHierarchyPresentation {
+        if let presentationCache { return presentationCache }
+        let snapshot = TodoHierarchyPresentation(items: items, archived: archived)
+        presentationCache = snapshot; presentationBuildCount += 1
+        return snapshot
+    }
     @Published var isAdding = false
     @Published var isExpanded = false
     @Published var isShowingArchive = false
@@ -100,7 +108,7 @@ final class TodoStore: ObservableObject {
     }
 
     var visibleItems: [TodoItem] {
-        let map = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+        let map = presentation.activeByID
         return items.filter { item in
             var cursor = item.parentId
             var visited = Set<UUID>()
@@ -113,12 +121,12 @@ final class TodoStore: ObservableObject {
     }
 
     var overflowCount: Int { max(0, visibleItems.count - maxVisible) }
-    func depth(of id: UUID) -> Int { TodoHierarchy.depth(of: id, in: items) }
-    func hasChildren(_ id: UUID) -> Bool { (items + archived).contains { $0.parentId == id } }
+    func depth(of id: UUID) -> Int { presentation.depths[id] ?? 0 }
+    func hasChildren(_ id: UUID) -> Bool { (presentation.progress[id]?.total ?? 0) > 0 }
+    func hasActiveChildren(_ id: UUID) -> Bool { presentation.activeParentIDs.contains(id) }
     func childProgress(_ id: UUID) -> (done: Int, total: Int) {
-        let all = items + archived
-        let ids = TodoHierarchy.descendantIDs(of: id, in: all).subtracting([id])
-        return (all.filter { ids.contains($0.id) && $0.completed }.count, ids.count)
+        let progress = presentation.progress[id]
+        return (progress?.done ?? 0, progress?.total ?? 0)
     }
 
     func toggleChildren(_ id: UUID) {
@@ -187,7 +195,8 @@ final class TodoStore: ObservableObject {
         guard let index = siblings.firstIndex(where: { $0.id == id }) else { return }
         draggingId = id
         reorderPreview = TodoReorderPreview(id: id, frames: rowFrames,
-            originalItems: items, targetSiblingIndex: index, translation: 0, offsets: [:])
+            originalItems: items, draggedIDs: TodoHierarchy.descendantIDs(of: id, in: items),
+            targetSiblingIndex: index, translation: 0, offsets: [:])
     }
 
     func updateRowDrag(translation: CGFloat) {
@@ -206,19 +215,21 @@ final class TodoStore: ObservableObject {
         let moved = TodoHierarchy.movingSibling(preview.id, to: preview.targetSiblingIndex, in: preview.originalItems)
         preview.translation = translation
         preview.offsets = TodoReorderPreview.offsets(original: preview.originalItems, reordered: moved,
-            frames: preview.frames, draggedIDs: TodoHierarchy.descendantIDs(of: preview.id, in: preview.originalItems), translation: translation)
+            frames: preview.frames, draggedIDs: preview.draggedIDs, translation: translation)
         reorderPreview = preview
     }
 
     func finishRowDrag(cancelled: Bool = false) {
         guard let preview = reorderPreview else { return }
         reorderPreview = nil; draggingId = nil
-        if !cancelled { moveSibling(id: preview.id, to: preview.targetSiblingIndex) }
+        if !cancelled, items.map(\.id) == preview.originalItems.map(\.id) {
+            moveSibling(id: preview.id, to: preview.targetSiblingIndex)
+        }
     }
 
     func isInDraggingSubtree(_ id: UUID) -> Bool {
         guard let preview = reorderPreview else { return false }
-        return TodoHierarchy.descendantIDs(of: preview.id, in: preview.originalItems).contains(id)
+        return preview.draggedIDs.contains(id)
     }
 
     @discardableResult

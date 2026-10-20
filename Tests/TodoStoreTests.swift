@@ -241,8 +241,14 @@ struct TodoStoreTests {
             b: CGRect(x: 0, y: 38, width: 350, height: 62), c: CGRect(x: 0, y: 106, width: 350, height: 44)]
         store.updateRowFrames(frames)
         let before = try Data(contentsOf: url)
+        _ = store.childProgress(a)
+        let cacheBuilds = store.presentationBuildCount
         store.beginRowDrag(a)
-        for y in 0...140 { store.updateRowDrag(translation: CGFloat(y)) }
+        for y in 0...140 {
+            store.updateRowDrag(translation: CGFloat(y))
+            _ = store.childProgress(a); _ = store.depth(of: b); _ = store.hasActiveChildren(a)
+        }
+        check(store.presentationBuildCount == cacheBuilds, "鼠标移动复用层级与进度缓存，不逐帧重算整棵树")
         check(store.items.map(\.id) == [a, b, c], "拖动预览不会反复改写列表和重建输入控件")
         let duringDrag = try Data(contentsOf: url)
         check(duringDrag == before, "每次鼠标移动不做磁盘写入")

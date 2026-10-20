@@ -90,6 +90,7 @@ struct TodoReorderPreview {
     var id: UUID
     var frames: [UUID: CGRect]
     var originalItems: [TodoItem]
+    var draggedIDs: Set<UUID>
     var targetSiblingIndex: Int
     var translation: CGFloat
     var offsets: [UUID: CGFloat]
@@ -111,5 +112,43 @@ struct TodoReorderPreview {
             y += frame.height + gap
         }
         return offsets
+    }
+}
+
+/// Derived data is built on model mutations, never on every drag/pointer frame.
+struct TodoHierarchyPresentation {
+    struct Progress { var done = 0; var total = 0 }
+    var activeByID: [UUID: TodoItem]
+    var depths: [UUID: Int]
+    var activeParentIDs: Set<UUID>
+    var progress: [UUID: Progress]
+
+    init(items: [TodoItem], archived: [TodoItem]) {
+        let active = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        activeByID = active
+        activeParentIDs = Set(items.compactMap(\.parentId))
+        var depthCache: [UUID: Int] = [:]
+        func depth(_ id: UUID, path: Set<UUID>) -> Int {
+            if let cached = depthCache[id] { return cached }
+            guard !path.contains(id), let parent = active[id]?.parentId, active[parent] != nil else {
+                depthCache[id] = 0; return 0
+            }
+            let value = depth(parent, path: path.union([id])) + 1
+            depthCache[id] = value; return value
+        }
+        for item in items { _ = depth(item.id, path: []) }
+        depths = depthCache
+        let all = Dictionary((items + archived).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var counts: [UUID: Progress] = [:]
+        for item in all.values {
+            var cursor = item.parentId
+            var path: Set<UUID> = [item.id]
+            while let parent = cursor, path.insert(parent).inserted, let ancestor = all[parent] {
+                counts[parent, default: Progress()].total += 1
+                if item.completed { counts[parent, default: Progress()].done += 1 }
+                cursor = ancestor.parentId
+            }
+        }
+        progress = counts
     }
 }
