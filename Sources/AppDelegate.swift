@@ -97,10 +97,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func installDragMonitor() {
         dragMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]
+            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp, .rightMouseDown]
         ) { [weak self] event in
             guard let self, let window = self.window else {
                 return event
+            }
+            // A second exit route when macOS crowds the status item off-screen.
+            // Limit the panel route to its title area, preserving text edit menus.
+            if event.type == .rightMouseDown {
+                guard event.window === window,
+                      self.store.isMinimized || self.isDraggableHeaderPoint(NSEvent.mouseLocation),
+                      let contentView = window.contentView else { return event }
+                let menu = NSMenu()
+                self.rebuildMenu(menu)
+                NSMenu.popUpContextMenu(menu, with: event, for: contentView)
+                return nil
             }
             if self.store.isMinimized {
                 // 拖出圆圈边界后 dragged/up 事件可能不再带 window，仍要继续本次拖动。
@@ -350,20 +361,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: - Status Item
 
     private func setupStatusItem() {
+        StatusItemPresentation.prepare()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        if let button = statusItem.button {
-            if let source = NSImage(systemSymbolName: "checklist",
-                                    accessibilityDescription: "液态待办") {
-                // 菜单栏使用模板图：macOS 会按当前菜单栏/壁纸对比度自动绘制为黑或白。
-                let icon = source.withSymbolConfiguration(
-                    NSImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
-                ) ?? source
-                icon.isTemplate = true
-                button.image = icon
-                button.contentTintColor = nil
-            }
-            button.toolTip = "贝卡の Todo list 🌟"
-        }
+        StatusItemPresentation.configure(statusItem)
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu

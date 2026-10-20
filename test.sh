@@ -33,7 +33,10 @@ grep -q 'flock(descriptor, LOCK_EX | LOCK_NB)' Sources/LiquidTodoMain.swift
 grep -q 'context.duration = windowMotionDuration' Sources/AppDelegate.swift
 grep -q 'window.hasShadow = false' Sources/AppDelegate.swift
 ! grep -q 'window.hasShadow = true' Sources/AppDelegate.swift
-grep -q 'icon.isTemplate = true' Sources/AppDelegate.swift
+grep -q 'icon.isTemplate = true' Sources/StatusItemPresentation.swift
+grep -q 'StatusItemPresentation.prepare()' Sources/AppDelegate.swift
+grep -q 'StatusItemPresentation.configure(statusItem)' Sources/AppDelegate.swift
+grep -q 'NSMenu.popUpContextMenu' Sources/AppDelegate.swift
 ! grep -q 'button.contentTintColor = NSColor' Sources/AppDelegate.swift
 grep -q 'snapMiniFrameToNearestEdge' Sources/AppDelegate.swift
 grep -q 'override var canBecomeMain: Bool { true }' Sources/WidgetWindow.swift
