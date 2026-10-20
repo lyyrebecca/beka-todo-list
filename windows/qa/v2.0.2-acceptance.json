@@ -20,5 +20,12 @@
   "localVm": "Separate UTM x64 QA copy with official Microsoft Windows11 evaluation ISO, 8GB/4 cores, QXL, USB2/PS2. Installer did not appear after more than 20 minutes. Stopped; original VM untouched. No EULA accepted or account created.",
   "policy": "Draft only until every client acceptance check passes. Do not update Packages latest or replace stable assets. No paid cloud resources.",
   "sourceCommit": "62c01aea5ce7261e77a6c1b6c1e129c128ef28a5",
-  "knownStressHistory": "One earlier candidate run failed a no-horizontal-movement assertion at cycle 97, with process alive and bounds valid. Later strict 100-cycle runs passed; optional native/WPF capture diagnostics now retained. Do not describe that earlier event as a confirmed crash or hide it."
+  "knownStressHistory": "One earlier candidate run failed a no-horizontal-movement assertion at cycle 97, with process alive and bounds valid. Later strict 100-cycle runs passed; optional native/WPF capture diagnostics now retained. Do not describe that earlier event as a confirmed crash or hide it.",
+  "persistencePatch": {
+    "beforeFix": "9 deterministic failure/rollback regressions failed; 4 baseline Windows11 client kernel cases failed",
+    "crossPlatformAfterFix": "94 passed; 3 Windows-only tests explicitly skipped on macOS",
+    "actualClientKernel": "4 of 4 passed on Windows11 EnterpriseEval 26H2 build 26300.9457 x64, Session0; NOT GUI acceptance",
+    "updatedCandidateGuiRetest": "pending",
+    "details": "persistence-regression.md"
+  }
 }

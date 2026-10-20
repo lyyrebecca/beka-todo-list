@@ -4,6 +4,7 @@ public sealed class TodoStore
 {
     private readonly PersistenceService _persistence;
     private readonly BackupService _backups;
+    private TodoSnapshot _lastCommitted;
     public List<TodoItem> Items { get; private set; }
     public List<TodoItem> Archived { get; private set; }
     public string? RecoveryMessage => _persistence.RecoveredCorruptFile is { } p ? $"已隔离损坏数据：{Path.GetFileName(p)}" : null;
@@ -16,6 +17,7 @@ public sealed class TodoStore
         var data = persistence.Load();
         Items = Sort(data.Items.Where(x => !x.Completed)).ToList();
         Archived = data.Archived.Concat(data.Items.Where(x => x.Completed)).OrderByDescending(x => x.CompletedAt ?? x.CreatedAt).ToList();
+        _lastCommitted = Snapshot();
     }
 
     public TodoItem Add(string text, TodoPriority priority = TodoPriority.Normal, TodoSchedule? schedule = null, DateTimeOffset? now = null)
@@ -89,7 +91,20 @@ public sealed class TodoStore
     }
 
     public IReadOnlyList<ReminderRequest> UpcomingReminders(DateTimeOffset now) => Items.SelectMany(x => ReminderEngine.GetRequests(x, now)).OrderBy(x => x.At).ToList();
-    public void Save() { _persistence.Save(Snapshot()); Changed?.Invoke(this, EventArgs.Empty); }
+    public void Save()
+    {
+        try { _persistence.Save(Snapshot()); }
+        catch
+        {
+            // A failed commit must not leave hidden in-memory edits that a later
+            // successful operation would unexpectedly flush to disk.
+            Items = [.. _lastCommitted.Items];
+            Archived = [.. _lastCommitted.Archived];
+            throw;
+        }
+        _lastCommitted = Snapshot();
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
     public static IEnumerable<TodoItem> Sort(IEnumerable<TodoItem> items) => items.OrderByDescending(x => x.Priority);
     private static void ValidateText(string text) { if (string.IsNullOrWhiteSpace(text)) throw new ArgumentException("待办内容不能为空。", nameof(text)); }
 }
