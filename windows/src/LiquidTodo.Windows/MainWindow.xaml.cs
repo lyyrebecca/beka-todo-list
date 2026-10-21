@@ -439,7 +439,7 @@ public partial class MainWindow : Window
         if (_interactionDiagnostics is null) return;
         var bounds = NativeWindow.Bounds(this);
         var cursorAvailable = NativeWindow.TryCursorPosition(out var cursor);
-        _interactionDiagnostics.Write("orb-" + stage,
+        _interactionDiagnostics.WriteInteraction("orb-" + stage,
             $"bounds={bounds.X},{bounds.Y},{bounds.Width},{bounds.Height}; dpi={NativeWindow.Dpi(this)}; " +
             $"cursorAvailable={cursorAvailable}; cursor={cursor.X},{cursor.Y}; " +
             $"pressed={_orbPressed}; dragging={_orbDragging}; captured={Orb.IsMouseCaptured}; " +
@@ -481,8 +481,14 @@ public partial class MainWindow : Window
     }
 
     private void DesktopButton_Click(object sender, RoutedEventArgs e) => ToggleDesktopMode();
-    private void ToggleDesktopMode() { _settings = _settings with { DesktopMode = !_settings.DesktopMode }; SaveSettings(); ApplyDesktopMode(); }
-    private void ApplyDesktopMode() { if (_safeMode) return; DesktopModeService.Apply(this, _settings.DesktopMode && !_settings.IsMinimized); _tray?.Balloon("贝卡の Todo list", _settings.DesktopMode ? "已沉入桌面：纯展示，鼠标会穿透。" : "已恢复可交互模式。"); }
+    private void ToggleDesktopMode()
+    {
+        _settings = _settings with { DesktopMode = !_settings.DesktopMode }; SaveSettings(); ApplyDesktopMode();
+        _tray?.Balloon("贝卡の Todo list", _settings.DesktopMode ? "已沉入桌面：纯展示，鼠标会穿透。" : "已恢复可交互模式。");
+    }
+    // Applying a window style is silent: minimize/restore/editor activation used
+    // to enqueue hundreds of unrequested system balloons during stress runs.
+    private void ApplyDesktopMode() { if (_safeMode) return; DesktopModeService.Apply(this, _settings.DesktopMode && !_settings.IsMinimized); }
     private void ToggleStartup() { _startup.SetEnabled(!_startup.IsEnabled); _tray?.Balloon("贝卡の Todo list", _startup.IsEnabled ? "已设为开机自动启动。" : "已关闭开机自动启动。"); }
     private void ToggleVisible() { if (!IsVisible) { Show(); ActivateFromSecondLaunch("activate"); } else Hide(); }
     private void ExportBackup() { var dialog = new Microsoft.Win32.SaveFileDialog { Filter = "LiquidTodo Backup|*.json", FileName = $"LiquidTodo-Backup-{DateTime.Now:yyyyMMdd-HHmmss}.json" }; if (dialog.ShowDialog(this) == true) { _store.Export(dialog.FileName); _tray?.Balloon("导出完成", Path.GetFileName(dialog.FileName)); } }

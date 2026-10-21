@@ -8,4 +8,5 @@
   </ItemGroup>
   <ItemGroup><None Include="..\..\..\shared\backup-schema\mac-legacy-data.fixture.json" Link="Fixtures\mac-legacy-data.fixture.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
   <ItemGroup><Compile Include="..\..\src\LiquidTodo.Windows\Services\SettingsService.cs" Link="SettingsService.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="..\..\src\LiquidTodo.Windows\Services\StartupDiagnostics.cs" Link="StartupDiagnostics.cs" /></ItemGroup>
 </Project>

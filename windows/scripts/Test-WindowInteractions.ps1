@@ -11,11 +11,17 @@ using System;
 using System.Runtime.InteropServices;
 public static class OrbInput {
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+  [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; public POINT(int x,int y) { X=x; Y=y; } }
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
   [DllImport("user32.dll")] public static extern void mouse_event(uint f, uint x, uint y, uint d, UIntPtr e);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT point);
+  [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT point);
+  [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr h, uint flags);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll")] public static extern IntPtr SetProcessDpiAwarenessContext(IntPtr c);
 }
 '@
@@ -68,7 +74,10 @@ function Bounds([IntPtr]$h) {
 }
 function Record([string]$stage,[IntPtr]$h,[int]$cycle) {
     $r=Bounds $h
-    $trace.Add(@{stage=$stage;cycle=$cycle;left=$r.Left;top=$r.Top;right=$r.Right;bottom=$r.Bottom;dpi=[OrbInput]::GetDpiForWindow($h);processAlive=(-not $process.HasExited)})
+    $hit=[OrbInput]::WindowFromPoint([OrbInput+POINT]::new([int](($r.Left+$r.Right)/2),[int](($r.Top+$r.Bottom)/2)))
+    $cursor=[OrbInput+POINT]::new(); [OrbInput]::GetCursorPos([ref]$cursor) | Out-Null
+    $cursorHit=[OrbInput]::WindowFromPoint($cursor)
+    $trace.Add(@{stage=$stage;cycle=$cycle;left=$r.Left;top=$r.Top;right=$r.Right;bottom=$r.Bottom;dpi=[OrbInput]::GetDpiForWindow($h);processAlive=(-not $process.HasExited);windowVisible=[OrbInput]::IsWindowVisible($h);foreground=[OrbInput]::GetForegroundWindow().ToInt64();centerHitWindow=$hit.ToInt64();centerHitRoot=[OrbInput]::GetAncestor($hit,2).ToInt64();cursorX=$cursor.X;cursorY=$cursor.Y;cursorHitRoot=[OrbInput]::GetAncestor($cursorHit,2).ToInt64();appWindow=$h.ToInt64()})
 }
 function Screenshot([string]$name,[IntPtr]$h) {
     $screen=[Windows.Forms.Screen]::FromHandle($h).Bounds
@@ -91,12 +100,14 @@ function Check-Visible([IntPtr]$h,[string]$stage) {
     $process.Refresh(); Check (-not $process.HasExited) "Process exited at $stage"
     $r=Bounds $h; $a=[Windows.Forms.Screen]::FromHandle($h).WorkingArea
     Check ($r.Right -gt $r.Left -and $r.Bottom -gt $r.Top) "Empty window at $stage"
+    Check ([OrbInput]::IsWindowVisible($h)) "Hidden window at $stage"
     Check ($r.Left -ge $a.Left -and $r.Top -ge $a.Top -and $r.Right -le $a.Right -and $r.Bottom -le $a.Bottom) "Offscreen window at $stage"
 }
 function Drag-Orb([IntPtr]$h,[int]$dx,[int]$dy,[int]$cycle,[int]$number) {
     [OrbInput]::SetForegroundWindow($h) | Out-Null
     $before=Bounds $h; $x=[int](($before.Left+$before.Right)/2); $y=[int](($before.Top+$before.Bottom)/2)
     [OrbInput]::SetCursorPos($x,$y) | Out-Null
+    Record "drag-$number-before-down" $h $cycle
     [OrbInput]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
     try {
         Start-Sleep -Milliseconds 25
@@ -107,6 +118,14 @@ function Drag-Orb([IntPtr]$h,[int]$dx,[int]$dy,[int]$cycle,[int]$number) {
         }
         $during=Bounds $h
         Record "drag-$number-held" $h $cycle
+        if ([Math]::Abs($during.Left-$before.Left) -lt [Math]::Abs($dx)*.6 -and -not $ExpectLegacyFailure) {
+            # Keep the original strict assertion. A delayed observation is only
+            # forensic evidence, NEVER a retry that turns this failure into pass.
+            Screenshot "failure-$cycle-$number-immediate" $h
+            Start-Sleep -Milliseconds 1000
+            Record "drag-$number-failure-after-1000ms-held" $h $cycle
+            Screenshot "failure-$cycle-$number-after-1000ms" $h
+        }
         Check ([Math]::Abs($during.Left-$before.Left) -ge [Math]::Abs($dx)*.6) "Horizontal drag frozen at cycle $cycle drag $number"
     }
     finally { [OrbInput]::mouse_event(4,0,0,0,[UIntPtr]::Zero) }
