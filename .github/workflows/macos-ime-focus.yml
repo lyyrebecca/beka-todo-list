@@ -2,7 +2,7 @@ name: macOS native initial input focus
 on:
   workflow_dispatch:
   pull_request:
-    paths: ["Sources/**", "Tests/**", "Info.plist", "build.sh", "test.sh", ".github/workflows/macos-ime-focus.yml"]
+    paths: ["Sources/**", "Tests/**", "Info.plist", "build.sh", "test.sh", "shared/compat-tests/**", "windows/src/LiquidTodo.Core/**", ".github/workflows/macos-ime-focus.yml"]
 permissions: { contents: read }
 jobs:
   native-focus:
@@ -10,6 +10,11 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - name: Real Swift and .NET backup interoperability
+        run: bash shared/compat-tests/test-cross-platform.sh
+        env: { DOTNET_CLI_TELEMETRY_OPTOUT: 1 }
       - name: Data and interaction regression
         run: ./test.sh
       - name: Native menu bar presentation regression
