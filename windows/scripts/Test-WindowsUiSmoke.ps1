@@ -11,6 +11,10 @@ public static class UiPointer {
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
   [DllImport("user32.dll")] public static extern void mouse_event(uint f, uint x, uint y, uint d, UIntPtr e);
   [DllImport("user32.dll")] public static extern IntPtr SetProcessDpiAwarenessContext(IntPtr c);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr h, System.Text.StringBuilder name, int size);
+  [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr h, uint flags);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll", SetLastError=true)] public static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, IntPtr l, uint flags, uint timeout, out IntPtr result);
 }
 '@
 [UiPointer]::SetProcessDpiAwarenessContext([IntPtr](-4)) | Out-Null
@@ -108,6 +112,22 @@ function Invoke-Button($element) {
         $pattern.Invoke(); return
     }
     # Native MessageBox buttons can be exposed as Pane peers on hosted runners.
+    # Target an observed real Button HWND rather than a rectangle sampled while
+    # Windows is still positioning a newly opened dialog. Orb/handle tests below
+    # continue to use actual mouse down/move/up without this fallback.
+    $handle=[IntPtr]$element.Current.NativeWindowHandle
+    if($handle -ne [IntPtr]::Zero) {
+        $class=[Text.StringBuilder]::new(256)
+        [UiPointer]::GetClassName($handle,$class,$class.Capacity) | Out-Null
+        if($class.ToString() -eq 'Button') {
+            $dialogButtonId=$element.Current.AutomationId
+            [UiPointer]::SetForegroundWindow([UiPointer]::GetAncestor($handle,2)) | Out-Null
+            $result=[IntPtr]::Zero
+            if([UiPointer]::SendMessageTimeout($handle,0x00F5,[IntPtr]::Zero,[IntPtr]::Zero,2,3000,[ref]$result) -eq [IntPtr]::Zero) { throw 'Observed native dialog button did not acknowledge BM_CLICK.' }
+            Write-Host "Native dialog activation: ID=$dialogButtonId"
+            return
+        }
+    }
     # Use the observed visible rectangle and real pointer input, then verify data.
     $rect=$element.Current.BoundingRectangle
     if ($element.Current.IsOffscreen -or $rect.Width -le 0 -or $rect.Height -le 0) { throw 'Control has no visible click rectangle.' }

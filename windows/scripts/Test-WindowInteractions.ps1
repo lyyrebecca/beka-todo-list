@@ -75,7 +75,7 @@ function Bounds([IntPtr]$h) {
 function Record([string]$stage,[IntPtr]$h,[int]$cycle) {
     $r=Bounds $h
     $hit=[OrbInput]::WindowFromPoint([OrbInput+POINT]::new([int](($r.Left+$r.Right)/2),[int](($r.Top+$r.Bottom)/2)))
-    $cursor=[OrbInput+POINT]::new(); [OrbInput]::GetCursorPos([ref]$cursor) | Out-Null
+    $cursor=[OrbInput+POINT]::new(0,0); [OrbInput]::GetCursorPos([ref]$cursor) | Out-Null
     $cursorHit=[OrbInput]::WindowFromPoint($cursor)
     $trace.Add(@{stage=$stage;cycle=$cycle;left=$r.Left;top=$r.Top;right=$r.Right;bottom=$r.Bottom;dpi=[OrbInput]::GetDpiForWindow($h);processAlive=(-not $process.HasExited);windowVisible=[OrbInput]::IsWindowVisible($h);foreground=[OrbInput]::GetForegroundWindow().ToInt64();centerHitWindow=$hit.ToInt64();centerHitRoot=[OrbInput]::GetAncestor($hit,2).ToInt64();cursorX=$cursor.X;cursorY=$cursor.Y;cursorHitRoot=[OrbInput]::GetAncestor($cursorHit,2).ToInt64();appWindow=$h.ToInt64()})
 }
