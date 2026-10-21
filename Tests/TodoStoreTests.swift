@@ -29,6 +29,7 @@ struct TodoStoreTests {
         try testHierarchyAndBackups(root)
         try testHierarchyCompletion(root)
         try testMeasuredReorderPreview(root)
+        try testBackupImportValidation(root)
         print("✅ TodoStore tests: \(passed) assertions passed")
     }
 
@@ -286,6 +287,32 @@ struct TodoStoreTests {
         check(store.childProgress(parent).done == 1 && store.childProgress(parent).total == 2, "父项进度包括已归档的完成子项")
         store.delete(parent)
         check(store.items.isEmpty && store.archived.isEmpty, "删除父项连同活动和已完成后代一起清理")
+    }
+
+    @MainActor
+    private static func testBackupImportValidation(_ root: URL) throws {
+        let folder = root.appendingPathComponent("import-validation", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let url = folder.appendingPathComponent("data.json")
+        let store = makeStore(url, scheduler: FakeNotificationScheduler())
+        store.add(text: "保留本机记录", due: nil)
+        let before = try Data(contentsOf: url)
+        var invalid = TodoBackupItem(TodoItem(text: "无效备份"))
+        invalid.createdAt = "not-an-ISO-date"
+        let bad = TodoBackupDocument(schemaVersion: 2, exportedAt: TodoBackupItem.iso(Date()), items: [invalid], archived: [])
+        let incoming = folder.appendingPathComponent("invalid-incoming.json")
+        try JSONEncoder().encode(bad).write(to: incoming)
+        var rejected = false
+        do { try store.importBackup(from: incoming, replacing: true) } catch { rejected = true }
+        check(rejected && store.items.map(\.text) == ["保留本机记录"], "无效时间戳备份必须整体拒绝，不能静默跳过后清空本机")
+        let after = try Data(contentsOf: url)
+        check(before == after, "拒绝无效备份时磁盘原始数据不变")
+        let valid = folder.appendingPathComponent("valid-incoming.json")
+        try store.exportBackup(to: valid)
+        for _ in 0..<5 { try store.importBackup(from: valid, replacing: false) }
+        let safety = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("LiquidTodo-auto-backup-") }
+        check(safety.count == 5, "同一秒连续导入的安全备份不能互相覆盖")
     }
 
     private static func check(_ condition: @autoclosure () -> Bool, _ message: String) {

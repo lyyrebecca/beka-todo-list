@@ -382,11 +382,21 @@ final class TodoStore: ObservableObject {
         let decoder = JSONDecoder()
         let backup = try decoder.decode(TodoBackupDocument.self, from: Data(contentsOf: url))
         guard TodoBackupDocument.supportedVersions.contains(backup.schemaVersion) else { throw CocoaError(.fileReadCorruptFile) }
-        let safety = fileURL.deletingLastPathComponent().appendingPathComponent("LiquidTodo-auto-backup-\(Int(Date().timeIntervalSince1970)).json")
+        // Validate the entire document before any replace/merge mutation. An
+        // invalid record must never be silently dropped by compactMap.
+        let decodedItems = try backup.items.map { record -> TodoItem in
+            guard let item = record.todoItem() else { throw CocoaError(.fileReadCorruptFile) }
+            return item
+        }
+        let decodedArchived = try backup.archived.map { record -> TodoItem in
+            guard let item = record.todoItem() else { throw CocoaError(.fileReadCorruptFile) }
+            return item
+        }
+        let safety = fileURL.deletingLastPathComponent().appendingPathComponent("LiquidTodo-auto-backup-\(Int(Date().timeIntervalSince1970))-\(UUID().uuidString).json")
         try exportBackup(to: safety)
         var known = Set((replacing ? [] : items + archived).map(\.id))
-        let incomingItems = backup.items.compactMap { $0.todoItem() }.filter { known.insert($0.id).inserted }
-        let incomingArchived = backup.archived.compactMap { $0.todoItem() }.filter { known.insert($0.id).inserted }
+        let incomingItems = decodedItems.filter { known.insert($0.id).inserted }
+        let incomingArchived = decodedArchived.filter { known.insert($0.id).inserted }
         if replacing { items = []; archived = [] }
         for var item in incomingItems { item.completed = false; item.completedAt = nil; insertByPriority(item) }
         archived.append(contentsOf: incomingArchived)
