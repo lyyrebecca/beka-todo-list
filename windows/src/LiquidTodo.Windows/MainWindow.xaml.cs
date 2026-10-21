@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private readonly ToastNotificationService? _toasts;
     private readonly bool _safeMode;
     private readonly Dictionary<Guid, System.Windows.Threading.DispatcherTimer> _undoTimers = [];
+    private HashSet<Guid> _collapsedIds = [];
     private NativeWindow.Point _orbStartMouse;
     private double _grabX, _grabY;
     private bool _orbPressed;
@@ -48,6 +49,7 @@ public partial class MainWindow : Window
         _paths = paths; _store = store; _safeMode = safeMode; _settingsService = new SettingsService(paths.SettingsFile); _settings = _settingsService.Load();
         if (arguments.Any(x => x.Equals("--diagnostics", StringComparison.OrdinalIgnoreCase)))
             _interactionDiagnostics = StartupDiagnostics.Create(paths);
+        _collapsedIds = _settings.CollapsedIds ?? [];
         ApplyTheme();
         SourceInitialized += (_, _) => { _themeSource = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle); _themeSource?.AddHook(ThemeMessage); };
         SystemEvents.UserPreferenceChanged += SystemPreferenceChanged;
@@ -190,7 +192,7 @@ public partial class MainWindow : Window
         if (_settings.IsMinimized && !_safeMode) return;
         ItemsHost.Children.Clear();
         var showArchive = ArchiveButton.Tag as string == "archive";
-        var source = showArchive ? _store.Archived : _store.Items;
+        IReadOnlyList<TodoItem> source = showArchive ? _store.Archived : _store.VisibleItems(_collapsedIds);
         Title = $"{OwnerName}の Todo list";
         NameTitle.Text = $"{OwnerName}の Todo list";
         NameTitle.ToolTip = Title;
@@ -224,14 +226,14 @@ public partial class MainWindow : Window
 
     private Border CreateTodoRow(TodoItem item)
     {
-        var row = new Border { Background = (Brush)FindResource("RowFill"), CornerRadius = new CornerRadius(12), Padding = new Thickness(8, 6, 6, 6), Margin = new Thickness(0, 3, 0, 3), Tag = item.Id };
+        var row = new Border { Background = (Brush)FindResource("RowFill"), CornerRadius = new CornerRadius(12), Padding = new Thickness(8, 6, 6, 6), Margin = new Thickness(Math.Min(TodoHierarchy.Depth(item.Id, _store.Items), 4) * 10, 3, 0, 3), Tag = item.Id };
         // Runtime-created controls need resource expressions too. A FindResource
         // brush is only a snapshot and leaves rows in the previous theme.
         row.SetResourceReference(Border.BackgroundProperty, "RowFill");
         var grid = new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(25) }); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(15) }); grid.ColumnDefinitions.Add(new ColumnDefinition()); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(96) }); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(25) }); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(20) });
         var done = new CheckBox { VerticalAlignment = VerticalAlignment.Center, ToolTip = item.Completed ? "撤销完成" : "标记为完成", IsChecked = item.Completed, IsThreeState = false };
         done.Checked += (_, _) => { if (!item.Completed) CompleteWithUndo(item.Id); };
-        done.Unchecked += (_, _) => { if (item.Completed) { if (_undoTimers.Remove(item.Id, out var timer)) timer.Stop(); _store.UndoCompletion(item.Id); } };
+        done.Unchecked += (_, _) => { if (item.Completed) { UndoCompletion(item.Id); } };
         Grid.SetColumn(done, 0); grid.Children.Add(done);
         if (item.Priority != TodoPriority.Normal)
         {
@@ -244,7 +246,14 @@ public partial class MainWindow : Window
         text.MouseLeftButtonUp += (_, _) => Edit(item); Grid.SetColumn(text, 2); grid.Children.Add(text);
         var label = new TextBlock { Text = LabelFor(item), Foreground = IsOverdue(item) ? (Brush)FindResource("Urgent") : (Brush)FindResource("AccentText"), FontSize = 10, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Right, TextTrimming = TextTrimming.CharacterEllipsis };
         label.SetResourceReference(TextBlock.ForegroundProperty, IsOverdue(item) ? "Urgent" : "AccentText");
-        Grid.SetColumn(label, 3); grid.Children.Add(label);
+        var details = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
+        var progress = _store.Progress(item.Id);
+        if (progress.Total > 0)
+        {
+            var count = new TextBlock { Text = $"{progress.Done}/{progress.Total}", FontSize = 10, TextAlignment = TextAlignment.Right };
+            count.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); details.Children.Add(count);
+        }
+        details.Children.Add(label); Grid.SetColumn(details, 3); grid.Children.Add(details);
         var edit = new Button { Content = "✎", Width = 22, Height = 24, Padding = new Thickness(0), BorderThickness = new Thickness(0), Background = Brushes.Transparent, Foreground = (Brush)FindResource("Muted"), ToolTip = "编辑待办" };
         edit.SetResourceReference(Control.ForegroundProperty, "Muted");
         System.Windows.Automation.AutomationProperties.SetName(edit, "编辑待办");
@@ -256,7 +265,17 @@ public partial class MainWindow : Window
         handle.DragCompleted += (_, _) => { row.Opacity = 1; MoveFromHandle(item.Id, Mouse.GetPosition(ItemsHost)); };
         Grid.SetColumn(handle, 5); grid.Children.Add(handle);
         row.ContextMenu = CreateTodoContextMenu(item);
-        row.Child = grid; return row;
+        // Keep the existing checkbox/drag automation and visual order stable.
+        var wrapper = new DockPanel { LastChildFill = true };
+        if (_store.Items.Any(x => x.ParentId == item.Id))
+        {
+            var collapse = new Button { Content = _collapsedIds.Contains(item.Id) ? "›" : "⌄", Width = 17, Padding = new Thickness(0), BorderThickness = new Thickness(0), Background = Brushes.Transparent, ToolTip = _collapsedIds.Contains(item.Id) ? "展开子待办" : "收起子待办" };
+            collapse.SetResourceReference(Control.ForegroundProperty, "Muted");
+            System.Windows.Automation.AutomationProperties.SetAutomationId(collapse, $"Collapse_{item.Id:N}");
+            collapse.Click += (_, _) => { if (!_collapsedIds.Add(item.Id)) _collapsedIds.Remove(item.Id); _settings = _settings with { CollapsedIds = _collapsedIds }; SaveSettings(); Render(); };
+            DockPanel.SetDock(collapse, Dock.Left); wrapper.Children.Add(collapse);
+        }
+        wrapper.Children.Add(grid); row.Child = wrapper; return row;
     }
 
     private static ControlTemplate CreateHandleTemplate()
@@ -266,21 +285,23 @@ public partial class MainWindow : Window
 
     private Border CreateArchiveRow(TodoItem item)
     {
-        var row = new Border { Background = (Brush)FindResource("RowFill"), CornerRadius = new CornerRadius(11), Padding = new Thickness(10, 7, 8, 7), Margin = new Thickness(0, 3, 0, 3) };
+        var row = new Border { Background = (Brush)FindResource("RowFill"), CornerRadius = new CornerRadius(11), Padding = new Thickness(10, 7, 8, 7), Margin = new Thickness(Math.Min(TodoHierarchy.Depth(item.Id, _store.Archived), 4) * 10, 3, 0, 3) };
         row.SetResourceReference(Border.BackgroundProperty, "RowFill");
         var grid = new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition()); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(52) }); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) });
         var archivedText = new TextBlock { Text = item.Text, TextDecorations = TextDecorations.Strikethrough, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
         archivedText.SetResourceReference(TextBlock.ForegroundProperty, "Muted"); grid.Children.Add(archivedText);
         var restore = new Button { Content = "恢复", FontSize = 10, Padding = new Thickness(4, 1, 4, 1) }; restore.Click += (_, _) => _store.RestoreArchived(item.Id); Grid.SetColumn(restore, 1); grid.Children.Add(restore);
         var delete = new Button { Content = "×", FontSize = 15, BorderThickness = new Thickness(0), Background = Brushes.Transparent, ToolTip = "永久删除" };
-        delete.SetResourceReference(Control.ForegroundProperty, "Muted"); delete.Click += (_, _) => _store.Delete(item.Id); Grid.SetColumn(delete, 2); grid.Children.Add(delete);
+        delete.SetResourceReference(Control.ForegroundProperty, "Muted"); delete.Click += (_, _) => DeleteItem(item.Id, archivedOnly: true); Grid.SetColumn(delete, 2); grid.Children.Add(delete);
         row.Child = grid; return row;
     }
 
     private void MoveFromHandle(Guid id, System.Windows.Point point)
     {
+        var item = _store.Items.FirstOrDefault(x => x.Id == id); if (item is null) return;
+        var siblings = _store.Items.Where(x => x.ParentId == item.ParentId && x.Id != id).Select(x => x.Id).ToHashSet();
         var target = 0;
-        foreach (var element in ItemsHost.Children.OfType<Border>().Where(x => x.Tag is Guid other && other != id))
+        foreach (var element in ItemsHost.Children.OfType<Border>().Where(x => x.Tag is Guid other && siblings.Contains(other)))
         {
             if (point.Y > element.TranslatePoint(new System.Windows.Point(0, 0), ItemsHost).Y + element.ActualHeight / 2) target++;
         }
@@ -318,6 +339,21 @@ public partial class MainWindow : Window
     {
         var menu = new ContextMenu();
         var edit = new MenuItem { Header = "编辑待办…" }; edit.Click += (_, _) => Edit(item); menu.Items.Add(edit);
+        var child = new MenuItem { Header = "添加子待办", IsEnabled = !item.Completed }; child.Click += (_, _) => StartAddUnder(item.Id); menu.Items.Add(child);
+        if (item.ParentId is { } parent)
+        {
+            var promote = new MenuItem { Header = "提升一级", IsEnabled = !item.Completed };
+            promote.Click += (_, _) => _store.SetParent(item.Id, _store.Items.FirstOrDefault(x => x.Id == parent)?.ParentId); menu.Items.Add(promote);
+        }
+        var move = new MenuItem { Header = "移动到…", IsEnabled = !item.Completed };
+        var root = new MenuItem { Header = "顶级待办", IsChecked = item.ParentId is null }; root.Click += (_, _) => _store.SetParent(item.Id, null); move.Items.Add(root);
+        var excluded = TodoHierarchy.Descendants(item.Id, _store.Items);
+        foreach (var candidate in _store.Items.Where(x => !x.Completed && !excluded.Contains(x.Id)))
+        {
+            var destination = new MenuItem { Header = new string(' ', Math.Min(8, TodoHierarchy.Depth(candidate.Id, _store.Items)) * 2) + candidate.Text, IsChecked = candidate.Id == item.ParentId };
+            destination.Click += (_, _) => { if (_store.SetParent(item.Id, candidate.Id)) { _collapsedIds.Remove(candidate.Id); _settings = _settings with { CollapsedIds = _collapsedIds }; SaveSettings(); Render(); } }; move.Items.Add(destination);
+        }
+        menu.Items.Add(move);
         if (item.Schedule is not null)
         {
             var clearTime = new MenuItem { Header = "清除时间安排" };
@@ -325,13 +361,16 @@ public partial class MainWindow : Window
             menu.Items.Add(clearTime);
         }
         menu.Items.Add(new Separator());
-        var delete = new MenuItem { Header = "删除" }; delete.Click += (_, _) => _store.Delete(item.Id); menu.Items.Add(delete);
+        var delete = new MenuItem { Header = TodoHierarchy.Descendants(item.Id, _store.Items.Concat(_store.Archived)).Count > 1 ? "删除待办及子项" : "删除" }; delete.Click += (_, _) => DeleteItem(item.Id); menu.Items.Add(delete);
         return menu;
     }
 
     private void CompleteWithUndo(Guid id)
     {
-        _store.Complete(id); Render();
+        var ids = TodoHierarchy.Descendants(id, _store.Items);
+        _store.Complete(id);
+        foreach (var key in _undoTimers.Keys.Where(ids.Contains).ToArray()) { _undoTimers[key].Stop(); _undoTimers.Remove(key); }
+        Render();
         var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
         timer.Tick += (_, _) => { timer.Stop(); _undoTimers.Remove(id); _store.ArchiveCompleted(id); };
         _undoTimers[id] = timer; timer.Start();
@@ -342,11 +381,36 @@ public partial class MainWindow : Window
     {
         var undo = new Button { Content = "已完成 · 撤销", Background = Brushes.Transparent, BorderBrush = (Brush)FindResource("AccentText"), Foreground = (Brush)FindResource("AccentText"), Margin = new Thickness(0, 4, 0, 0) };
         undo.SetResourceReference(Control.BorderBrushProperty, "AccentText"); undo.SetResourceReference(Control.ForegroundProperty, "AccentText");
-        undo.Click += (_, _) => { if (_undoTimers.Remove(id, out var t)) t.Stop(); _store.UndoCompletion(id); }; ItemsHost.Children.Insert(0, undo);
+        undo.Click += (_, _) => { UndoCompletion(id); }; ItemsHost.Children.Insert(0, undo);
     }
 
     private void AddButton_Click(object sender, RoutedEventArgs e) => StartAdd();
-    private void StartAdd() { ActivateFromSecondLaunch("activate"); var editor = new TodoEditorWindow(null) { Owner = this }; if (editor.ShowDialog() == true) { try { _store.Add(editor.TodoText, editor.Priority, editor.Schedule); } catch (ArgumentException ex) { MessageBox.Show(this, ex.Message); } } }
+    private void StartAdd() => StartAddUnder(null);
+    private void StartAddUnder(Guid? parentId)
+    {
+        ActivateFromSecondLaunch("activate"); ArchiveButton.Tag = null;
+        var parent = _store.Items.FirstOrDefault(x => x.Id == parentId);
+        var editor = new TodoEditorWindow(null, parent?.Text) { Owner = this };
+        if (editor.ShowDialog() == true)
+        {
+            try { if (parentId is { } id) _collapsedIds.Remove(id); _store.Add(editor.TodoText, editor.Priority, editor.Schedule, parentId: parentId); }
+            catch (ArgumentException ex) { MessageBox.Show(this, ex.Message); }
+        }
+    }
+    private void UndoCompletion(Guid id)
+    {
+        var key = _store.CompletionGroupKey(id); _store.UndoCompletion(id);
+        if (_undoTimers.Remove(key, out var timer)) timer.Stop();
+    }
+    private void DeleteItem(Guid id, bool archivedOnly = false)
+    {
+        var source = archivedOnly ? _store.Archived : _store.Items.Concat(_store.Archived);
+        var ids = TodoHierarchy.Descendants(id, source);
+        if (ids.Count > 1 && MessageBox.Show(this, "删除此待办及全部子项？此操作不能撤销。", Title, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (archivedOnly) _store.DeleteArchived(id); else _store.Delete(id);
+        foreach (var key in _undoTimers.Keys.Where(ids.Contains).ToArray()) { _undoTimers[key].Stop(); _undoTimers.Remove(key); }
+        _collapsedIds.ExceptWith(ids);
+    }
     private void Edit(TodoItem item) { ActivateFromSecondLaunch("activate"); var editor = new TodoEditorWindow(item) { Owner = this }; if (editor.ShowDialog() == true) _store.Update(item.Id, editor.TodoText, editor.Priority, editor.Schedule); }
     private void ArchiveButton_Click(object sender, RoutedEventArgs e) { ArchiveButton.Tag = ArchiveButton.Tag as string == "archive" ? null : "archive"; Render(); }
     private void ClearArchived() { if (_store.Archived.Count > 0 && MessageBox.Show(this, "确定清空全部已完成事项？", "贝卡の Todo list", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes) _store.ClearArchived(); }

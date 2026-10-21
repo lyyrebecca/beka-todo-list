@@ -12,7 +12,7 @@ public sealed class BackupService
         if (root.ValueKind != JsonValueKind.Object) throw new InvalidDataException("备份必须是 JSON 对象。");
         if (root.TryGetProperty("schemaVersion", out var version))
         {
-            if (!version.TryGetInt32(out var number) || number != LiquidTodoBackup.CurrentSchemaVersion)
+            if (!version.TryGetInt32(out var number) || number is < 1 or > LiquidTodoBackup.CurrentSchemaVersion)
                 throw new InvalidDataException("不支持该备份版本，未修改本机待办。");
             var backup = JsonSerializer.Deserialize<LiquidTodoBackup>(root.GetRawText(), LiquidTodoJson.Options)
                 ?? throw new InvalidDataException("无效的 LiquidTodo Backup v1 文件。");
@@ -28,7 +28,7 @@ public sealed class BackupService
     public void Write(string path, TodoSnapshot snapshot)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var backup = new LiquidTodoBackup(LiquidTodoBackup.CurrentSchemaVersion, DateTimeOffset.UtcNow, snapshot.Items, snapshot.Archived);
+        var backup = new LiquidTodoBackup(snapshot.Items.Concat(snapshot.Archived).Any(x => x.ParentId.HasValue) ? 2 : 1, DateTimeOffset.UtcNow, snapshot.Items, snapshot.Archived);
         File.WriteAllText(path, JsonSerializer.Serialize(backup, LiquidTodoJson.Options));
     }
 
@@ -60,7 +60,8 @@ public sealed class BackupService
         var complete = value.TryGetProperty("completed", out var rawCompleted) && rawCompleted.GetBoolean();
         var completedAt = LegacyDate(value, "completedAt");
         var schedule = ReadLegacySchedule(value, due);
-        return new TodoItem(id, text, created, schedule?.PrimaryDate ?? due, schedule, priority, complete, completedAt).Normalize();
+        var parentId = value.TryGetProperty("parentId", out var rawParent) && rawParent.ValueKind == JsonValueKind.String && Guid.TryParse(rawParent.GetString(), out var parent) ? (Guid?)parent : null;
+        return new TodoItem(id, text, created, schedule?.PrimaryDate ?? due, schedule, priority, complete, completedAt, parentId).Normalize();
     }
 
     private static TodoSchedule? ReadLegacySchedule(JsonElement item, DateTimeOffset? due)

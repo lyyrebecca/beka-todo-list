@@ -11,9 +11,9 @@ public partial class TodoEditorWindow : Window
     public string TodoText => TodoTextBox.Text;
     public TodoPriority Priority => ParseEnum<TodoPriority>(PriorityInput);
     public TodoSchedule? Schedule { get; private set; }
-    public TodoEditorWindow(TodoItem? item)
+    public TodoEditorWindow(TodoItem? item, string? parentName = null)
     {
-        InitializeComponent(); _item = item; TitleText.Text = item is null ? "新建待办" : "编辑待办";
+        InitializeComponent(); _item = item; TitleText.Text = item is null ? parentName is null ? "新建待办" : $"拆分：{parentName}" : "编辑待办";
         var schedule = item?.Schedule;
         TodoTextBox.Text = item?.Text ?? "";
         Select(PriorityInput, item?.Priority ?? TodoPriority.Normal);

@@ -2,7 +2,7 @@ using System.Text.Json;
 using LiquidTodo.Core;
 namespace LiquidTodo.Windows.Services;
 internal sealed record AppSettings(string? OwnerName = null, bool IsMinimized = false, bool DesktopMode = false, double? Left = null, double? Top = null,
-    int PlacementVersion = 2, WindowPlacement? PanelPlacement = null, WindowPlacement? OrbPlacement = null);
+    int PlacementVersion = 2, WindowPlacement? PanelPlacement = null, WindowPlacement? OrbPlacement = null, HashSet<Guid>? CollapsedIds = null);
 internal sealed class SettingsService
 {
     private readonly string _path;
