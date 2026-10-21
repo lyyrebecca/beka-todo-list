@@ -349,7 +349,15 @@ public partial class MainWindow : Window
     private void StartAdd() { ActivateFromSecondLaunch("activate"); var editor = new TodoEditorWindow(null) { Owner = this }; if (editor.ShowDialog() == true) { try { _store.Add(editor.TodoText, editor.Priority, editor.Schedule); } catch (ArgumentException ex) { MessageBox.Show(this, ex.Message); } } }
     private void Edit(TodoItem item) { ActivateFromSecondLaunch("activate"); var editor = new TodoEditorWindow(item) { Owner = this }; if (editor.ShowDialog() == true) _store.Update(item.Id, editor.TodoText, editor.Priority, editor.Schedule); }
     private void ArchiveButton_Click(object sender, RoutedEventArgs e) { ArchiveButton.Tag = ArchiveButton.Tag as string == "archive" ? null : "archive"; Render(); }
-    private void ClearArchived() { if (_store.Archived.Count > 0 && MessageBox.Show(this, "确定清空全部已完成事项？", "贝卡の Todo list", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes) _store.ClearArchived(); }
+    private void ClearArchived()
+    {
+        if (_store.Archived.Count == 0) return;
+        var answer = MessageBox.Show(this, "确定清空全部已完成事项？", "贝卡の Todo list", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        _interactionDiagnostics?.WriteInteraction("archive-clear-confirmation", $"answer={answer}");
+        if (answer != MessageBoxResult.Yes) return;
+        _store.ClearArchived();
+        _interactionDiagnostics?.WriteInteraction("archive-cleared", $"remaining={_store.Archived.Count}");
+    }
 
     private void CustomizeNameButton_Click(object sender, RoutedEventArgs e) => CustomizeOwnerName();
     private void EnsureOwnerName() { if (_settings.OwnerName is null) CustomizeOwnerName(); }
