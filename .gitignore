@@ -28,3 +28,7 @@ windows/**/obj/
 windows/publish/
 windows/release/
 windows-evidence/
+
+# Cross-platform compatibility test build outputs
+shared/compat-tests/bin/
+shared/compat-tests/obj/

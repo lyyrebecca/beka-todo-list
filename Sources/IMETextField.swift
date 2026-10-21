@@ -13,11 +13,13 @@ struct IMETextField: NSViewRepresentable {
     let font: NSFont
     let textColor: NSColor
     let roundedBorder: Bool
+    var focusRequest: UUID? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
     func makeNSView(context: Context) -> NSTextField {
         let field = IMECompatibleTextField()
+        field.cell = IMETextFieldCell(textCell: "")
         field.delegate = context.coordinator
         field.placeholderString = placeholder
         field.font = font
@@ -39,6 +41,7 @@ struct IMETextField: NSViewRepresentable {
 
     func updateNSView(_ field: NSTextField, context: Context) {
         context.coordinator.parent = self
+        context.coordinator.updateFocusRequest(focusRequest)
         field.placeholderString = placeholder
         field.font = font
         field.textColor = textColor
@@ -53,6 +56,9 @@ struct IMETextField: NSViewRepresentable {
 
     static func dismantleNSView(_ field: NSTextField, coordinator: Coordinator) {
         coordinator.cancelFocusRequest()
+        // A dismissed SwiftUI form must not leave a marked-text client alive.
+        field.currentEditor()?.inputContext?.discardMarkedText()
+        field.abortEditing()
         (field as? IMECompatibleTextField)?.onWindowChanged = nil
         (field as? IMECompatibleTextField)?.onLayoutReady = nil
     }
@@ -65,13 +71,21 @@ struct IMETextField: NSViewRepresentable {
         private var dismantled = false
         private weak var observedWindow: NSWindow?
         private var observations: [NSObjectProtocol] = []
+        private var lastFocusRequest: UUID?
 
-        init(parent: IMETextField) { self.parent = parent }
+        init(parent: IMETextField) { self.parent = parent; lastFocusRequest = parent.focusRequest }
         deinit { observations.forEach(NotificationCenter.default.removeObserver) }
 
         func controlTextDidChange(_ notification: Notification) {
             guard let field else { return }
             parent.text = field.stringValue
+        }
+
+        func updateFocusRequest(_ request: UUID?) {
+            guard request != lastFocusRequest else { return }
+            lastFocusRequest = request
+            initialFocusCompleted = false
+            requestInitialFocusIfNeeded()
         }
 
         func windowAttachmentChanged() {
@@ -97,14 +111,15 @@ struct IMETextField: NSViewRepresentable {
                 guard let self else { return }
                 self.focusQueued = false
                 guard !self.dismantled, !self.initialFocusCompleted,
-                      let field, let window, field.window === window, window.isVisible else { return }
+                      let field, let window, field.window === window, window.isVisible,
+                      field.bounds.width > 1, field.bounds.height > 1,
+                      !field.visibleRect.isEmpty else { return }
                 Task { @MainActor in
                     guard !self.dismantled, !self.initialFocusCompleted,
                           field.window === window else { return }
                     if let delegate = NSApp.delegate as? AppDelegate {
                         delegate.activateForTextInput(responder: field)
                     } else {
-                        NSApp.setActivationPolicy(.regular)
                         NSApp.activate(ignoringOtherApps: true)
                         window.makeKeyAndOrderFront(nil)
                         window.makeMain()
@@ -115,7 +130,7 @@ struct IMETextField: NSViewRepresentable {
                     // ownership succeed; didBecomeActive/Key will retry it.
                     guard NSApp.isActive, window.isKeyWindow,
                           let editor = field.currentEditor(), window.firstResponder === editor else { return }
-                    editor.inputContext?.activate()
+                    editor.inputContext?.invalidateCharacterCoordinates()
                     self.initialFocusCompleted = true
                     self.removeObservations()
                 }
@@ -135,7 +150,7 @@ struct IMETextField: NSViewRepresentable {
     }
 }
 
-private final class IMECompatibleTextField: NSTextField {
+final class IMECompatibleTextField: NSTextField {
     var onWindowChanged: (() -> Void)?
     var onLayoutReady: (() -> Void)?
     override var acceptsFirstResponder: Bool { true }
@@ -145,11 +160,56 @@ private final class IMECompatibleTextField: NSTextField {
     }
     override func layout() {
         super.layout()
+        currentEditor()?.inputContext?.invalidateCharacterCoordinates()
         onLayoutReady?()
     }
     override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
-        if accepted { currentEditor()?.inputContext?.activate() }
+        if accepted, window?.isKeyWindow == true, NSApp.isActive,
+           bounds.width > 1, bounds.height > 1 {
+            currentEditor()?.inputContext?.invalidateCharacterCoordinates()
+        }
         return accepted
+    }
+}
+
+/// A field owns its editor, rather than borrowing a shared editor left behind
+/// by another SwiftUI field/popover. This also gives IMEs a stable screen anchor.
+final class IMETextFieldCell: NSTextFieldCell {
+    private let editor: IMEFieldEditor = {
+        let editor = IMEFieldEditor()
+        editor.isFieldEditor = true
+        editor.isRichText = false
+        editor.drawsBackground = false
+        return editor
+    }()
+
+    override func fieldEditor(for controlView: NSView) -> NSTextView? {
+        editor.ownerField = controlView as? NSTextField
+        return editor
+    }
+}
+
+final class IMEFieldEditor: NSTextView {
+    weak var ownerField: NSTextField?
+
+    override func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
+        let proposed = super.firstRect(forCharacterRange: range, actualRange: actualRange)
+        guard let field = ownerField, let window = field.window else { return proposed }
+        let anchor = window.convertToScreen(field.convert(field.bounds, to: nil))
+        return Self.candidateRect(proposed: proposed, fieldRect: anchor,
+                                  fontHeight: field.font?.boundingRectForFont.height ?? 18)
+    }
+
+    static func candidateRect(proposed: NSRect, fieldRect: NSRect, fontHeight: CGFloat) -> NSRect {
+        // AppKit can temporarily report (0,0,0,0) during a first insertion or
+        // animated resize. Passing it to WeChat IME opens its input at screen 0,0.
+        let finite = [proposed.minX, proposed.minY, proposed.width, proposed.height].allSatisfy(\.isFinite)
+        if finite, proposed.height > 0,
+           fieldRect.insetBy(dx: -8, dy: -8).intersects(proposed.insetBy(dx: -1, dy: 0)) {
+            return proposed
+        }
+        return NSRect(x: fieldRect.minX + 4, y: fieldRect.minY + 2,
+                      width: 1, height: max(1, min(fontHeight, fieldRect.height)))
     }
 }

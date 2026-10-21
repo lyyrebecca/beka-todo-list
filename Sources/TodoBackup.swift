@@ -1,9 +1,10 @@
 import Foundation
 
-/// 跨平台、可人工保存的 LiquidTodo Backup v1。所有时刻均写为 ISO 8601 UTC；期间只写日历日，避免跨时区偏移。
-struct TodoBackupV1: Codable {
-    static let schemaVersion = 1
-    var schemaVersion: Int = TodoBackupV1.schemaVersion
+/// v1 flat backups remain readable; hierarchy uses v2 so old clients reject it
+/// explicitly instead of silently flattening and losing parent relationships.
+struct TodoBackupDocument: Codable {
+    static let supportedVersions: Set<Int> = [1, 2]
+    var schemaVersion: Int
     var exportedAt: String
     var items: [TodoBackupItem]
     var archived: [TodoBackupItem]
@@ -18,19 +19,21 @@ struct TodoBackupItem: Codable {
     var priority: String
     var completed: Bool
     var completedAt: String?
+    var parentId: UUID?
 
     init(_ item: TodoItem) {
         id = item.id; text = item.text; createdAt = Self.iso(item.createdAt)
         dueDate = item.dueDate.map(Self.iso); schedule = item.schedule.map(TodoBackupSchedule.init)
         priority = ["normal", "important", "urgent"][item.priority.rawValue]
         completed = item.completed; completedAt = item.completedAt.map(Self.iso)
+        parentId = item.parentId
     }
     func todoItem() -> TodoItem? {
         guard let created = Self.date(createdAt) else { return nil }
         let p: TodoPriority = priority == "urgent" ? .urgent : priority == "important" ? .important : .normal
         return TodoItem(id: id, text: text, createdAt: created, dueDate: dueDate.flatMap(Self.date),
                         schedule: schedule?.todoSchedule(), priority: p, completed: completed,
-                        completedAt: completedAt.flatMap(Self.date))
+                        completedAt: completedAt.flatMap(Self.date), parentId: parentId)
     }
     static let formatter: ISO8601DateFormatter = { let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f }()
     static func iso(_ date: Date) -> String { formatter.string(from: date) }

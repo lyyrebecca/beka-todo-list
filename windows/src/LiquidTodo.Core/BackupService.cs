@@ -9,22 +9,30 @@ public sealed class BackupService
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         var root = document.RootElement;
-        if (root.TryGetProperty("schemaVersion", out _))
+        if (root.ValueKind != JsonValueKind.Object) throw new InvalidDataException("备份必须是 JSON 对象。");
+        if (root.TryGetProperty("schemaVersion", out var version))
         {
-            return JsonSerializer.Deserialize<LiquidTodoBackup>(root.GetRawText(), LiquidTodoJson.Options)
+            if (!version.TryGetInt32(out var number) || number is < 1 or > LiquidTodoBackup.CurrentSchemaVersion)
+                throw new InvalidDataException("不支持该备份版本，未修改本机待办。");
+            var backup = JsonSerializer.Deserialize<LiquidTodoBackup>(root.GetRawText(), LiquidTodoJson.Options)
                 ?? throw new InvalidDataException("无效的 LiquidTodo Backup v1 文件。");
+            if (backup.Items is null || backup.Archived is null || backup.Items.Concat(backup.Archived).Any(x => x is null || x.Text is null || x.Id == Guid.Empty))
+                throw new InvalidDataException("备份中的待办记录缺失或损坏，未修改本机待办。");
+            return backup;
         }
+        if (!root.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
+            throw new InvalidDataException("无法识别该备份格式，未修改本机待办。");
         return ReadLegacyMac(root);
     }
 
     public void Write(string path, TodoSnapshot snapshot)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var backup = new LiquidTodoBackup(LiquidTodoBackup.CurrentSchemaVersion, DateTimeOffset.UtcNow, snapshot.Items, snapshot.Archived);
+        var backup = new LiquidTodoBackup(snapshot.Items.Concat(snapshot.Archived).Any(x => x.ParentId.HasValue) ? 2 : 1, DateTimeOffset.UtcNow, snapshot.Items, snapshot.Archived);
         File.WriteAllText(path, JsonSerializer.Serialize(backup, LiquidTodoJson.Options));
     }
 
-    public static string SuggestedExportFile(string directory) => Path.Combine(directory, $"LiquidTodo-Backup-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.json");
+    public static string SuggestedExportFile(string directory) => Path.Combine(directory, $"LiquidTodo-Backup-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.json");
 
     private static LiquidTodoBackup ReadLegacyMac(JsonElement root)
     {
@@ -52,7 +60,8 @@ public sealed class BackupService
         var complete = value.TryGetProperty("completed", out var rawCompleted) && rawCompleted.GetBoolean();
         var completedAt = LegacyDate(value, "completedAt");
         var schedule = ReadLegacySchedule(value, due);
-        return new TodoItem(id, text, created, schedule?.PrimaryDate ?? due, schedule, priority, complete, completedAt).Normalize();
+        var parentId = value.TryGetProperty("parentId", out var rawParent) && rawParent.ValueKind == JsonValueKind.String && Guid.TryParse(rawParent.GetString(), out var parent) ? (Guid?)parent : null;
+        return new TodoItem(id, text, created, schedule?.PrimaryDate ?? due, schedule, priority, complete, completedAt, parentId).Normalize();
     }
 
     private static TodoSchedule? ReadLegacySchedule(JsonElement item, DateTimeOffset? due)

@@ -11,9 +11,9 @@ public partial class TodoEditorWindow : Window
     public string TodoText => TodoTextBox.Text;
     public TodoPriority Priority => ParseEnum<TodoPriority>(PriorityInput);
     public TodoSchedule? Schedule { get; private set; }
-    public TodoEditorWindow(TodoItem? item)
+    public TodoEditorWindow(TodoItem? item, string? parentName = null)
     {
-        InitializeComponent(); _item = item; TitleText.Text = item is null ? "新建待办" : "编辑待办";
+        InitializeComponent(); _item = item; TitleText.Text = item is null ? parentName is null ? "新建待办" : $"拆分：{parentName}" : "编辑待办";
         var schedule = item?.Schedule;
         TodoTextBox.Text = item?.Text ?? "";
         Select(PriorityInput, item?.Priority ?? TodoPriority.Normal);
@@ -25,7 +25,7 @@ public partial class TodoEditorWindow : Window
         EndInput.SelectedDate = schedule?.EndDate?.ToDateTime(TimeOnly.MinValue) ?? DateTime.Today.AddDays(1);
         var reminderMinute = schedule?.ReminderTimeMinutes ?? 1260;
         ReminderTimeInput.Text = $"{reminderMinute / 60:00}:{reminderMinute % 60:00}";
-        Loaded += (_, _) => { TodoTextBox.Focus(); TodoTextBox.SelectAll(); ConfigureReminderOptions(ParseEnum<TodoTimeMode>(ModeInput)); RefreshRows(); };
+        Loaded += (_, _) => { Services.NativeWindow.FitToWorkArea(this); TodoTextBox.Focus(); TodoTextBox.SelectAll(); ConfigureReminderOptions(ParseEnum<TodoTimeMode>(ModeInput)); RefreshRows(); };
     }
     private void ModeInput_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

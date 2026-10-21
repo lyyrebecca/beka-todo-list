@@ -10,7 +10,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     static var frameWidth: CGFloat { widgetWidth + 12 }
     static let miniSize: CGFloat = 48
 
-    let store = TodoStore()
+    let store: TodoStore
+    override convenience init() { self.init(store: TodoStore()) }
+    init(store: TodoStore) { self.store = store; super.init() }
     var window: WidgetWindow!
     var statusItem: NSStatusItem!
     private var hasSized = false
@@ -31,8 +33,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        UNUserNotificationCenter.current()
-            .requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        NSApp.mainMenu = ApplicationMenu.make(target: self, newAction: #selector(startAdding), quitAction: #selector(quit))
+        if ProcessInfo.processInfo.environment["LIQUIDTODO_SANDBOX"] != "1" {
+            UNUserNotificationCenter.current()
+                .requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        }
         setupWindow()
         setupStatusItem()
         if ProcessInfo.processInfo.environment["LIQUIDTODO_START_ADDING"] == "1" {
@@ -205,9 +210,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if !hasSized {
             hasSized = true
             window.setFrame(target, display: true, animate: false)
-        } else {
+        } else if !store.isAdding && store.editingTextId == nil {
             window.setFrame(target, display: true, animate: true)
+        } else {
+            // Keep the native text-input client's geometry stable while the
+            // first form appears; a moving field-editor anchor confuses IMEs.
+            window.setFrame(target, display: true, animate: false)
         }
+        window.contentView?.layoutSubtreeIfNeeded()
+        (window.firstResponder as? NSTextView)?.inputContext?.invalidateCharacterCoordinates()
     }
 
     private var saveWorkItem: DispatchWorkItem?
@@ -443,6 +454,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func startAdding() {
         if store.isMinimized { restoreWidget() }
+        store.addingParentId = nil
         activateForTextInput()
         store.isShowingArchive = false
         store.isAdding = true
@@ -455,29 +467,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// which must become first responder after activation for WeChat IME.
     func activateForTextInput(responder: NSResponder? = nil) {
         guard let window else { return }
-        // An accessory app does not become the active text-input client over a
-        // full-screen Space on macOS 14+. Promote it only while text is being
-        // edited, then return to its dockless widget mode when editing ends.
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
-        window.makeMain()
-
-        if let inputView = responder as? NSView, let inputWindow = inputView.window {
-            inputWindow.makeKeyAndOrderFront(nil)
-            inputWindow.makeFirstResponder(responder)
-        } else if let responder {
-            window.makeFirstResponder(responder)
-        }
+        // Keep one native activation policy for the entire editing lifecycle.
+        // Switching accessory/regular during insertion races third-party IME
+        // registration even when AppKit already reports a focused field editor.
+        if !NSApp.isActive { NSApp.activate(ignoringOtherApps: true) }
+        let editorWindow = (responder as? NSView)?.window
+        // An onAppear/activation callback without a responder must not steal
+        // the key window back from a Todo editing popover.
+        let target: NSWindow = editorWindow ?? (store.editingTextId != nil ? NSApp.keyWindow : nil) ?? window
+        if !target.isKeyWindow { target.makeKeyAndOrderFront(nil) }
+        if target.canBecomeMain && !target.isMainWindow { target.makeMain() }
+        target.contentView?.layoutSubtreeIfNeeded()
+        if let responder { target.makeFirstResponder(responder) }
+        (target.firstResponder as? NSTextView)?.inputContext?.invalidateCharacterCoordinates()
     }
 
     private func setTextInputSessionActive(_ isActive: Bool) {
         guard !isActive else { return }
-        // Let SwiftUI finish dismissing its field/popover before hiding the
-        // temporary Dock presence used to obtain a third-party IME context.
         DispatchQueue.main.async { [weak self] in
             guard let self, !self.store.isAdding, self.store.editingTextId == nil else { return }
-            NSApp.setActivationPolicy(.accessory)
+            self.window?.endEditing(for: nil)
         }
     }
 

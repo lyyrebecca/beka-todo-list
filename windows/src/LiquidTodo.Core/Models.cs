@@ -41,7 +41,8 @@ public sealed record TodoItem(
     TodoSchedule? Schedule = null,
     TodoPriority Priority = TodoPriority.Normal,
     bool Completed = false,
-    DateTimeOffset? CompletedAt = null)
+    DateTimeOffset? CompletedAt = null,
+    Guid? ParentId = null)
 {
     public static TodoItem Create(string text, TodoPriority priority = TodoPriority.Normal, TodoSchedule? schedule = null, DateTimeOffset? now = null) =>
         new(Guid.NewGuid(), text.Trim(), now ?? DateTimeOffset.UtcNow, schedule?.PrimaryDate, schedule?.Normalize(), priority);
@@ -62,7 +63,7 @@ public sealed record LiquidTodoBackup(
     List<TodoItem> Items,
     List<TodoItem> Archived)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 }
 
 public enum ImportMode { Merge, Replace }
