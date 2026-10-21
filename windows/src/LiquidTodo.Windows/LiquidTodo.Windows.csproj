@@ -8,7 +8,7 @@
     <ApplicationIcon>Assets\LiquidTodo.ico</ApplicationIcon>
     <AssemblyName>LiquidTodo</AssemblyName>
     <RootNamespace>LiquidTodo.Windows</RootNamespace>
-    <Version>2.0.1</Version>
+    <Version>2.0.2</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <PublishSingleFile>false</PublishSingleFile>
@@ -21,6 +21,5 @@
          publishing too: CopyToOutputDirectory alone is not a packaging contract. -->
     <Content Include="Assets\LiquidTodo.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
     <Content Include="Assets\LiquidTodo.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
-    <Content Include="Assets\LiquidGlassPanel.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
   </ItemGroup>
 </Project>

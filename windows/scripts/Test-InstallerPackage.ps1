@@ -18,7 +18,6 @@ try {
     $exe = Join-Path $installDir 'LiquidTodo.exe'
     $assets = Join-Path $installDir 'Assets'
     if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'Setup did not install LiquidTodo.exe.' }
-    if (-not (Test-Path -LiteralPath (Join-Path $assets 'LiquidGlassPanel.png') -PathType Leaf)) { throw 'Setup omitted the glass panel asset.' }
     if (-not (Test-Path -LiteralPath (Join-Path $assets 'LiquidTodo.ico') -PathType Leaf)) { throw 'Setup omitted the tray icon.' }
 
     $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'

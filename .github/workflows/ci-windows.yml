@@ -3,6 +3,9 @@ on:
   push: { branches: [main, feature/windows-v2] }
   pull_request:
   workflow_dispatch:
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  WINAPP_CLI_TELEMETRY_OPTOUT: 1
 jobs:
   windows:
     runs-on: windows-latest
@@ -10,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: 8.0.x }
-      - run: dotnet test windows/LiquidTodo.Windows.sln -c Release
+      - run: dotnet test windows/LiquidTodo.Windows.sln -c Release --logger "trx;LogFileName=windows.trx" --results-directory evidence/unit-tests
       - run: dotnet publish windows/src/LiquidTodo.Windows/LiquidTodo.Windows.csproj -c Release -r win-x64 --self-contained true -p:DebugType=None -p:DebugSymbols=false -o windows/publish
       - name: Build and verify Portable package
         shell: pwsh
@@ -23,6 +26,34 @@ jobs:
           ./windows/scripts/New-PortableManifest.ps1 -PublishDirectory release/portable -OutputFile release/portable/manifest.json -Version ci
           Compress-Archive release/portable/* release/LiquidTodo-Windows-x64-Portable-ci.zip
           ./windows/scripts/Test-PortablePackage.ps1 -PackagePath release/LiquidTodo-Windows-x64-Portable-ci.zip -LaunchSmokeTest -RunUiSmokeTest
+      - name: Verify released Microsoft UI tooling
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force evidence/tooling | Out-Null
+          gh release download v0.7.1 --repo microsoft/winappcli --pattern winappcli-x64.zip --dir "$env:RUNNER_TEMP/winapp-download"
+          Expand-Archive "$env:RUNNER_TEMP/winapp-download/winappcli-x64.zip" "$env:RUNNER_TEMP/winapp-tool"
+          $tool = Get-ChildItem "$env:RUNNER_TEMP/winapp-tool" -Filter winapp.exe -Recurse | Select-Object -First 1
+          if (-not $tool) { throw 'Released winapp CLI binary missing.' }
+          "WINAPP_TOOL=$($tool.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          & $tool.FullName --version | Tee-Object evidence/tooling/version.txt
+          & $tool.FullName ui --help | Tee-Object evidence/tooling/ui-help.txt
+          if ($LASTEXITCODE -ne 0) { Write-Host 'Released tool does not expose UI commands; using UIA/Win32 regression as planned.' }
+      - name: Reproduce old orbital drag regression
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v2.0.1 --repo '${{ github.repository }}' --pattern '*Windows*x64*Portable*.zip' --dir "$env:RUNNER_TEMP/legacy-download"
+          $zip = Get-ChildItem "$env:RUNNER_TEMP/legacy-download" -Filter '*.zip' | Select-Object -First 1
+          Expand-Archive $zip.FullName "$env:RUNNER_TEMP/orb-legacy"
+          ./windows/scripts/Test-WindowInteractions.ps1 -ExecutablePath "$env:RUNNER_TEMP/orb-legacy/LiquidTodo.exe" -EvidenceDirectory evidence/orb-legacy -Cycles 3 -ExpectLegacyFailure
+      - name: Real mouse window regression (100 cycles, 200 drags)
+        shell: pwsh
+        run: |
+          Expand-Archive release/LiquidTodo-Windows-x64-Portable-ci.zip "$env:RUNNER_TEMP/orb-candidate"
+          ./windows/scripts/Test-WindowInteractions.ps1 -ExecutablePath "$env:RUNNER_TEMP/orb-candidate/LiquidTodo.exe" -EvidenceDirectory evidence/orb-candidate -Cycles 100
       - name: Render Windows UI evidence
         shell: pwsh
         run: |
@@ -35,3 +66,6 @@ jobs:
         with: { name: LiquidTodo-Windows-x64-publish, path: release }
       - uses: actions/upload-artifact@v4
         with: { name: LiquidTodo-Windows-ui-smoke, path: release/windows-ui-smoke.png }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: Windows-regression-evidence, path: evidence }

@@ -9,11 +9,19 @@ public sealed class BackupService
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         var root = document.RootElement;
-        if (root.TryGetProperty("schemaVersion", out _))
+        if (root.ValueKind != JsonValueKind.Object) throw new InvalidDataException("备份必须是 JSON 对象。");
+        if (root.TryGetProperty("schemaVersion", out var version))
         {
-            return JsonSerializer.Deserialize<LiquidTodoBackup>(root.GetRawText(), LiquidTodoJson.Options)
+            if (!version.TryGetInt32(out var number) || number != LiquidTodoBackup.CurrentSchemaVersion)
+                throw new InvalidDataException("不支持该备份版本，未修改本机待办。");
+            var backup = JsonSerializer.Deserialize<LiquidTodoBackup>(root.GetRawText(), LiquidTodoJson.Options)
                 ?? throw new InvalidDataException("无效的 LiquidTodo Backup v1 文件。");
+            if (backup.Items is null || backup.Archived is null || backup.Items.Concat(backup.Archived).Any(x => x is null || x.Text is null || x.Id == Guid.Empty))
+                throw new InvalidDataException("备份中的待办记录缺失或损坏，未修改本机待办。");
+            return backup;
         }
+        if (!root.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
+            throw new InvalidDataException("无法识别该备份格式，未修改本机待办。");
         return ReadLegacyMac(root);
     }
 
@@ -24,7 +32,7 @@ public sealed class BackupService
         File.WriteAllText(path, JsonSerializer.Serialize(backup, LiquidTodoJson.Options));
     }
 
-    public static string SuggestedExportFile(string directory) => Path.Combine(directory, $"LiquidTodo-Backup-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.json");
+    public static string SuggestedExportFile(string directory) => Path.Combine(directory, $"LiquidTodo-Backup-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.json");
 
     private static LiquidTodoBackup ReadLegacyMac(JsonElement root)
     {

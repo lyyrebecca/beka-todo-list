@@ -32,7 +32,9 @@ public partial class App : System.Windows.Application
             _ownsMutex = isFirst;
             if (!isFirst)
             {
-                SingleInstanceService.SignalExisting(InstanceName, e.Args.Any(x => x.Equals("--import", StringComparison.OrdinalIgnoreCase)) ? "import" : "activate");
+                var importIndex = Array.FindIndex(e.Args, x => x.Equals("--import", StringComparison.OrdinalIgnoreCase));
+                SingleInstanceService.SignalExisting(InstanceName, importIndex >= 0 && importIndex + 1 < e.Args.Length
+                    ? new("import", Path.GetFullPath(e.Args[importIndex + 1])) : new("activate"));
                 Shutdown(); return;
             }
 
@@ -54,7 +56,12 @@ public partial class App : System.Windows.Application
         catch (Exception exception) { ReportFatalStartupError(exception, paths); }
     }
 
-    private void HandleSecondLaunch(string command) => _mainWindow?.ActivateFromSecondLaunch(command);
+    private void HandleSecondLaunch(InstanceCommand command)
+    {
+        _diagnostics?.Write("instance", $"received action={command.Action}; hasImportPath={command.ImportPath is not null}");
+        _mainWindow?.ActivateFromSecondLaunch("activate");
+        if (command.Action == "import" && command.ImportPath is {} path) _mainWindow?.ImportRequestedBackup(path);
+    }
 
     private static bool TryReadCapturePath(IEnumerable<string> arguments, out string path)
     {
@@ -92,6 +99,11 @@ public partial class App : System.Windows.Application
         {
             _diagnostics?.WriteException("dispatcher-unhandled", eventArgs.Exception);
             eventArgs.Handled = true;
+            if (eventArgs.Exception is IOException or UnauthorizedAccessException)
+            {
+                MessageBox.Show("无法保存更改，原有数据文件未被替换。请检查目录权限和磁盘空间后重试。", "保存失败", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
             ReportFatalStartupError(eventArgs.Exception, null);
         };
         AppDomain.CurrentDomain.UnhandledException += (_, eventArgs) =>
