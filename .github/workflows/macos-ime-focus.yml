@@ -14,6 +14,8 @@ jobs:
         run: ./test.sh
       - name: Native menu bar presentation regression
         run: ./Tests/run-status-item-tests.sh
+      - name: Native bounded list and archive layout regression
+        run: ./Tests/run-layout-tests.sh "$RUNNER_TEMP/layout-evidence"
       - name: Universal build and signature verification
         run: ./build.sh
       - name: Native delayed attachment and no focus stealing regression
@@ -22,4 +24,6 @@ jobs:
         if: always()
         with:
           name: macOS-native-focus-evidence
-          path: ${{ runner.temp }}/ime-focus-evidence/results.json
+          path: |
+            ${{ runner.temp }}/ime-focus-evidence/results.json
+            ${{ runner.temp }}/layout-evidence/results.json

@@ -32,6 +32,17 @@ struct StatusItemPresentationTests {
         check(item.button?.image?.size == NSSize(width: 18, height: 18), "bounded nonzero symbol size")
         StatusItemPresentation.configure(item, symbol: nil)
         check(item.button?.title == "干" && item.button?.image == nil, "missing symbol has visible text fallback")
+        let target = NSObject()
+        let appMenu = ApplicationMenu.make(target: target, newAction: Selector(("newTodo:")), quitAction: Selector(("quit:")))
+        let quit = appMenu.items[0].submenu!.items[0]
+        let new = appMenu.items[1].submenu!.items[0]
+        check(quit.keyEquivalent == "q" && quit.target === target, "Command-Q works without opening status menu")
+        check(new.keyEquivalent == "n" && new.target === target, "native Command-N command target")
+        let edit = appMenu.items[2].submenu!
+        check(edit.items.first(where: { $0.title == "复制" })?.keyEquivalent == "c", "native copy command")
+        check(edit.items.first(where: { $0.title == "粘贴" })?.keyEquivalent == "v", "native paste command")
+        check(edit.items.first(where: { $0.title == "全选" })?.keyEquivalent == "a", "native select-all command")
+        check(edit.items.first(where: { $0.title == "重做" })?.keyEquivalentModifierMask == [.command, .shift], "native redo modifiers")
         print("Status item native checks: \(passed) passed. Not a screenshot/visibility-on-screen test.")
     }
 }

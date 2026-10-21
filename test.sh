@@ -6,7 +6,7 @@ BIN="${TMPDIR:-/tmp}/LiquidTodoTests-$$"
 trap 'rm -f "$BIN"' EXIT
 
 xcrun swiftc -swift-version 5 -target "$(uname -m)-apple-macos14.0" \
-  -o "$BIN" Sources/TodoItem.swift Sources/TodoDraft.swift Sources/TodoBackup.swift Sources/TodoStore.swift \
+  -o "$BIN" Sources/TodoItem.swift Sources/TodoDraft.swift Sources/TodoBackup.swift Sources/TodoHierarchy.swift Sources/TodoStore.swift \
   Tests/TodoStoreTests.swift
 "$BIN"
 
@@ -43,10 +43,10 @@ grep -q 'override var canBecomeMain: Bool { true }' Sources/WidgetWindow.swift
 grep -q 'makeKeyAndOrderFront' Sources/WidgetWindow.swift
 grep -q 'func activateForTextInput(responder: NSResponder? = nil)' Sources/AppDelegate.swift
 grep -q 'struct IMETextField: NSViewRepresentable' Sources/IMETextField.swift
-grep -q 'inputWindow.makeFirstResponder(responder)' Sources/AppDelegate.swift
-grep -q 'NSApp.setActivationPolicy(.regular)' Sources/AppDelegate.swift
-grep -q 'NSApp.setActivationPolicy(.accessory)' Sources/AppDelegate.swift
-grep -q 'inputContext?.activate()' Sources/IMETextField.swift
+grep -q 'target.makeFirstResponder(responder)' Sources/AppDelegate.swift
+! grep -q 'NSApp.setActivationPolicy(.regular)' Sources/AppDelegate.swift
+grep -q 'IMEFieldEditor' Sources/IMETextField.swift
+grep -q 'invalidateCharacterCoordinates()' Sources/IMETextField.swift
 grep -q 'IMETextField(text: \$draft.text' Sources/WidgetView.swift
 grep -q 'onRequestTextInput()' Sources/WidgetView.swift
 echo "✅ Interaction regression guards: drag, header buttons, editing, mini mode, inside-out gradient, single-instance guard, third-party IME focus"

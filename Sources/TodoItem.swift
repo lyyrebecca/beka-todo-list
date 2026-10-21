@@ -76,11 +76,12 @@ struct TodoItem: Identifiable, Codable, Equatable {
     var priority: TodoPriority = .normal
     var completed: Bool = false
     var completedAt: Date? = nil
+    var parentId: UUID? = nil
 
     init(id: UUID = UUID(), text: String, createdAt: Date = Date(),
          dueDate: Date? = nil, schedule: TodoSchedule? = nil,
          priority: TodoPriority = .normal, completed: Bool = false,
-         completedAt: Date? = nil) {
+         completedAt: Date? = nil, parentId: UUID? = nil) {
         self.id = id
         self.text = text
         self.createdAt = createdAt
@@ -89,10 +90,11 @@ struct TodoItem: Identifiable, Codable, Equatable {
         self.priority = priority
         self.completed = completed
         self.completedAt = completedAt
+        self.parentId = parentId
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, text, createdAt, dueDate, schedule, priority, completed, completedAt
+        case id, text, createdAt, dueDate, schedule, priority, completed, completedAt, parentId
     }
 
     init(from decoder: Decoder) throws {
@@ -107,5 +109,6 @@ struct TodoItem: Identifiable, Codable, Equatable {
         priority = try c.decodeIfPresent(TodoPriority.self, forKey: .priority) ?? .normal
         completed = try c.decodeIfPresent(Bool.self, forKey: .completed) ?? false
         completedAt = try c.decodeIfPresent(Date.self, forKey: .completedAt)
+        parentId = try c.decodeIfPresent(UUID.self, forKey: .parentId)
     }
 }

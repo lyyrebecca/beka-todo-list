@@ -6,6 +6,12 @@ final class WidgetWindow: NSWindow {
     // 第三方中文输入法（包括微信输入法）需要 Main/Key Window 才会建立文本输入上下文。
     override var canBecomeMain: Bool { true }
 
+    // Use the event's own coordinates, not the global hardware cursor. Input
+    // forwarding / accessibility drivers need not move that hardware cursor.
+    static func screenPoint(for event: NSEvent) -> NSPoint {
+        event.window.map { $0.convertPoint(toScreen: event.locationInWindow) } ?? event.locationInWindow
+    }
+
     override func sendEvent(_ event: NSEvent) {
         if event.type == .leftMouseDown || event.type == .rightMouseDown {
             NSApp.activate(ignoringOtherApps: true)
