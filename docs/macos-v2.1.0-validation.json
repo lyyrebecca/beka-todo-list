@@ -1,0 +1,28 @@
+{
+  "version": "macOS v2.1.0",
+  "scope": "Mac-only; Windows download binaries and source remain unchanged from stable main",
+  "macChecks": {
+    "modelAndHierarchyAssertions": 57,
+    "nativeMenuAssertions": 15,
+    "nativeInputClientAssertions": 11,
+    "nativeLayoutAndInputCoordinateAssertions": 7
+  },
+  "realInteractions": [
+    "WeChat Pinyin physical keys committed Chinese in first add and edit fields",
+    "recursive child creation and collapse/expand",
+    "parent tree completion, undo, archive and restore",
+    "promote/reparent menus",
+    "variable row-height and entire subtree physical mouse reorder"
+  ],
+  "screenshotData": "Synthetic, isolated from user data; same production UI sources with data/notification-only test launcher",
+  "limitations": [
+    "Windows client tests stopped at user request; new Windows features not released",
+    "No claim of exhaustive third-party candidate popup positioning coverage",
+    "Edge autoscroll not implemented",
+    "Intel slice compiled and signed, not executed on an Intel Mac"
+  ],
+  "backupCompatibility": {
+    "flat": "schemaVersion 1; compatible with Windows v2.0.1",
+    "hierarchical": "schemaVersion 2; macOS v2.1.0 only among public releases"
+  }
+}

@@ -9,16 +9,32 @@ final class FocusTestDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
     var results: [[String: Any]] = []
     var text = ""
+    var focusRequest: UUID? = nil
     let otherControl = NSButton(title: "Other control", target: nil, action: nil)
     var removedHost: NSHostingView<IMETextField>?
 
     func makeInput() -> IMETextField {
         IMETextField(text: Binding(get: { self.text }, set: { self.text = $0 }),
                      placeholder: "IME focus regression test", font: .systemFont(ofSize: 14),
-                     textColor: .labelColor, roundedBorder: true)
+                     textColor: .labelColor, roundedBorder: true, focusRequest: focusRequest)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A shell-launched component test has no real user click to grant
+        // accessory activation. Establish its test host once, before insertion;
+        // production accessory activation is tested separately with real CUA input.
+        NSApp.activate(ignoringOtherApps: true)
+        let fieldRect = NSRect(x: 800, y: 500, width: 300, height: 24)
+        let invalidRect = IMEFieldEditor.candidateRect(proposed: .zero, fieldRect: fieldRect, fontHeight: 18)
+        results.append(["check": "zero-caret-rect-anchors-to-field-not-screen-origin",
+                        "passed": fieldRect.contains(invalidRect)])
+        let validRect = NSRect(x: 920, y: 502, width: 1, height: 18)
+        results.append(["check": "valid-composition-caret-position-preserved",
+                        "passed": IMEFieldEditor.candidateRect(proposed: validRect, fieldRect: fieldRect, fontHeight: 18) == validRect])
+        let firstCell = IMETextFieldCell(textCell: "")
+        let secondCell = IMETextFieldCell(textCell: "")
+        results.append(["check": "fields-do-not-share-stale-field-editor",
+                        "passed": firstCell.fieldEditor(for: NSTextField()) !== secondCell.fieldEditor(for: NSTextField())])
         host = NSHostingView(rootView: makeInput())
         host.frame = NSRect(x: 0, y: 0, width: 350, height: 70)
         host.layoutSubtreeIfNeeded()
@@ -55,6 +71,8 @@ final class FocusTestDelegate: NSObject, NSApplicationDelegate {
         results.append(["check": "initial-focus-after-delayed-attachment", "passed": focused,
                         "appActive": NSApp.isActive, "windowKey": window.isKeyWindow,
                         "fieldEditorAttached": editor != nil])
+        results.append(["check": "native-field-actually-uses-dedicated-input-client",
+                        "passed": editor is IMEFieldEditor])
         // Once initial focus succeeds, redraws must not steal it from a picker/button.
         window.makeFirstResponder(otherControl)
         host.needsLayout = true
@@ -81,6 +99,26 @@ final class FocusTestDelegate: NSObject, NSApplicationDelegate {
             self.results.append(["check": "native-marked-text-preserved",
                                  "passed": hadMarkedText && editor.hasMarkedText() && editor.string.contains("zhong")])
             editor.unmarkText()
+            self.checkExplicitFocusRequest()
+        }
+    }
+
+    func checkExplicitFocusRequest() {
+        window.makeFirstResponder(otherControl)
+        focusRequest = UUID()
+        host.rootView = makeInput()
+        host.layoutSubtreeIfNeeded()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            let field = self.findField(self.host)
+            self.results.append(["check": "explicit-next-entry-refocus-after-submit",
+                                 "passed": field?.currentEditor() != nil && self.window.firstResponder === field?.currentEditor()])
+            if let editor = field?.currentEditor() as? IMEFieldEditor {
+                self.window.setFrameOrigin(NSPoint(x: 460, y: 400))
+                let anchor = self.window.convertToScreen(field!.convert(field!.bounds, to: nil))
+                let caret = editor.firstRect(forCharacterRange: NSRange(location: 0, length: 0), actualRange: nil)
+                self.results.append(["check": "candidate-anchor-follows-window-move",
+                                     "passed": anchor.insetBy(dx: -8, dy: -8).intersects(caret)])
+            }
             self.checkCancelledInsertion()
         }
     }
@@ -121,7 +159,7 @@ struct IMEFocusTests {
         let app = NSApplication.shared
         let delegate = FocusTestDelegate()
         app.delegate = delegate
-        app.setActivationPolicy(.accessory)
+        app.setActivationPolicy(.regular)
         app.run()
         withExtendedLifetime(delegate) {}
     }

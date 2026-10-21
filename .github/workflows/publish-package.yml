@@ -6,7 +6,7 @@ on:
       version:
         description: Release tag to mirror into GitHub Packages
         required: true
-        default: v2.0.4
+        default: v2.1.0
 
 permissions:
   contents: read
