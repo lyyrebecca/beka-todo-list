@@ -7,7 +7,7 @@ internal sealed class TrayService : IDisposable
 {
     private readonly Forms.NotifyIcon _icon;
     public TrayService(string iconFile, Action showHide, Action add, Action desktop, Func<bool> desktopEnabled,
-        Action startup, Func<bool> startupEnabled, Action import, Action export, Action clearArchived, Action exit)
+        Action startup, Func<bool> startupEnabled, Action import, Action export, Action clearArchived, Action exit, Action recover)
     {
         // A missing icon must never make a WinExe vanish before its first window.
         // The package validator still treats the custom icon as required; this only
@@ -21,6 +21,7 @@ internal sealed class TrayService : IDisposable
         {
             menu.Items.Clear();
             menu.Items.Add("显示 / 隐藏", null, (_, _) => showHide());
+            menu.Items.Add("找回窗口", null, (_, _) => recover());
             menu.Items.Add("添加待办", null, (_, _) => add());
             var desktopItem = (Forms.ToolStripMenuItem)menu.Items.Add("沉入桌面（纯展示，不可点击）", null, (_, _) => desktop()); desktopItem.Checked = desktopEnabled();
             var startupItem = (Forms.ToolStripMenuItem)menu.Items.Add("开机自动启动", null, (_, _) => startup()); startupItem.Checked = startupEnabled();

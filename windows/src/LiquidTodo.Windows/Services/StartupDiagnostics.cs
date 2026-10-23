@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text;
+using System.Threading.Channels;
 using LiquidTodo.Core;
 
 namespace LiquidTodo.Windows.Services;
@@ -14,11 +15,24 @@ internal sealed class StartupDiagnostics
     private readonly string _logDirectory;
     private readonly string _logFile;
     private readonly object _gate = new();
+    private readonly Channel<string> _interactionLines = Channel.CreateBounded<string>(new BoundedChannelOptions(512)
+    { SingleReader = true, FullMode = BoundedChannelFullMode.DropOldest });
 
     private StartupDiagnostics(string logDirectory)
     {
         _logDirectory = logDirectory;
         _logFile = Path.Combine(logDirectory, $"startup-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmssfff}.log");
+        // Input hooks must never wait for disk/antivirus/another diagnostic reader.
+        // Startup/fatal messages still use the synchronous, best-effort path.
+        _ = Task.Run(async () =>
+        {
+            await foreach (var line in _interactionLines.Reader.ReadAllAsync())
+            {
+                var batch = new StringBuilder(line);
+                while (batch.Length < 65536 && _interactionLines.Reader.TryRead(out var next)) batch.Append(next);
+                Append(batch.ToString());
+            }
+        });
     }
 
     public string LogFile => _logFile;
@@ -45,13 +59,19 @@ internal sealed class StartupDiagnostics
     }
 
     public void Write(string stage, string detail)
+        => Append($"{DateTimeOffset.UtcNow:O} [{stage}] {detail}{Environment.NewLine}");
+
+    public void WriteInteraction(string stage, string detail)
+        => _interactionLines.Writer.TryWrite($"{DateTimeOffset.UtcNow:O} [{stage}] {detail}{Environment.NewLine}");
+
+    private void Append(string text)
     {
         try
         {
             lock (_gate)
             {
                 Directory.CreateDirectory(_logDirectory);
-                File.AppendAllText(_logFile, $"{DateTimeOffset.UtcNow:O} [{stage}] {detail}{Environment.NewLine}", new UTF8Encoding(false));
+                File.AppendAllText(_logFile, text, new UTF8Encoding(false));
             }
         }
         catch

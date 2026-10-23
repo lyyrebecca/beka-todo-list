@@ -1,46 +1,30 @@
 using CommunityToolkit.WinUI.Notifications;
+using System.Windows.Threading;
 using LiquidTodo.Core;
-
 namespace LiquidTodo.Windows.Services;
-
-/// <summary>Uses the stable AUMID for native toasts; resident timers remain a deterministic fallback for unpackaged installs.</summary>
 internal sealed class ToastNotificationService : IDisposable
 {
-    private readonly Dictionary<string, System.Threading.Timer> _timers = [];
+    private readonly DispatcherTimer _heartbeat;
+    private readonly ReminderPoller _poller = new(DateTimeOffset.Now);
+    private readonly Func<DateTimeOffset, IReadOnlyList<ReminderRequest>> _source;
     private readonly Action<string, string> _fallback;
+    private readonly Func<string> _title;
     public bool NativeRegistrationAvailable { get; private set; } = true;
-    public ToastNotificationService(Action<string, string> fallback) => _fallback = fallback;
-
-    public void Rebuild(IEnumerable<ReminderRequest> requests)
+    public ToastNotificationService(Action<string, string> fallback, Func<DateTimeOffset, IReadOnlyList<ReminderRequest>> source, Func<string> title)
     {
-        CancelAll();
-        foreach (var request in requests)
+        _fallback = fallback; _source = source; _title = title;
+        _heartbeat = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+        _heartbeat.Tick += (_, _) => Rebuild(); _heartbeat.Start();
+    }
+    public void Rebuild()
+    {
+        // Current store invalidates edited/deleted/completed reminders. Short
+        // UI-thread polling avoids Timer dueTime limits and callback races.
+        foreach (var request in _poller.Poll(DateTimeOffset.Now, _source))
         {
-            var due = request.At - DateTimeOffset.Now;
-            if (due <= TimeSpan.Zero) continue;
-            _timers[request.Identifier] = new System.Threading.Timer(_ => Deliver(request), null, due, Timeout.InfiniteTimeSpan);
+            try { new ToastContentBuilder().AddText(_title()).AddText(request.Text).Show(); }
+            catch { NativeRegistrationAvailable = false; _fallback(_title(), request.Text); }
         }
     }
-
-    public void Cancel(IEnumerable<string> identifiers)
-    {
-        foreach (var id in identifiers) if (_timers.Remove(id, out var timer)) timer.Dispose();
-    }
-
-    private void Deliver(ReminderRequest request)
-    {
-        try
-        {
-            new ToastContentBuilder().AddText("贝卡の Todo list").AddText(request.Text).Show();
-        }
-        catch
-        {
-            NativeRegistrationAvailable = false;
-            _fallback("贝卡の Todo list", request.Text);
-        }
-        finally { if (_timers.Remove(request.Identifier, out var timer)) timer.Dispose(); }
-    }
-
-    private void CancelAll() { foreach (var item in _timers.Values) item.Dispose(); _timers.Clear(); }
-    public void Dispose() => CancelAll();
+    public void Dispose() => _heartbeat.Stop();
 }
